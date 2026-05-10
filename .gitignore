@@ -1,0 +1,46 @@
+node_modules/
+dist/
+build/
+out/
+.turbo/
+.cache/
+.parcel-cache/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# electron
+apps/desktop/dist-electron/
+apps/desktop/release/
+
+# playwright
+playwright-report/
+test-results/
+.last-run.json
+
+# OS
+*.tmp
+
+# uploaded user assets (server)
+apps/server/data/

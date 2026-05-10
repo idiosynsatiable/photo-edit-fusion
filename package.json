@@ -1,0 +1,37 @@
+{
+  "name": "photo-edit-fusion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "All-in-one photo editor (PWA + Electron) with overlay, blend, cut, font extraction and font cloning.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.10.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/**\" run build && pnpm -r --filter \"./apps/**\" run build",
+    "dev": "pnpm --parallel -r run dev",
+    "dev:web": "pnpm --filter @pef/web run dev",
+    "dev:server": "pnpm --filter @pef/server run dev",
+    "dev:desktop": "pnpm --filter @pef/desktop run dev",
+    "test": "pnpm -r run test",
+    "test:e2e": "playwright test",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "scan-secrets": "node scripts/scan-secrets.mjs",
+    "scan-placeholders": "node scripts/scan-placeholders.mjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm scan-secrets && pnpm scan-placeholders && pnpm test",
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^8.6.0",
+    "@typescript-eslint/parser": "^8.6.0",
+    "eslint": "^9.10.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.1"
+  }
+}

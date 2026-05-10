@@ -1,0 +1,33 @@
+{
+  "name": "@pef/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-renderer.mjs",
+    "dev": "node scripts/dev.mjs",
+    "start": "electron .",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package": "electron-builder --publish=never"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^31.4.0",
+    "electron-builder": "^25.0.5",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.1"
+  },
+  "build": {
+    "appId": "com.photoeditfusion.app",
+    "productName": "Photo Edit Fusion",
+    "directories": { "output": "release" },
+    "files": ["dist-electron/**", "renderer/**"],
+    "mac": { "category": "public.app-category.graphics-design" },
+    "win": { "target": "nsis" },
+    "linux": { "target": ["AppImage", "deb"] }
+  }
+}
