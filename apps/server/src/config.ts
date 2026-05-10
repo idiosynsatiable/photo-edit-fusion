@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
+// Default port: when running under Railway/Heroku/etc, $PORT is injected and
+// must be honored. Otherwise fall back to the local default 4317.
+const portDefault = Number.parseInt(process.env.PORT ?? '', 10);
+const PORT_DEFAULT = Number.isFinite(portDefault) && portDefault > 0 ? portDefault : 4317;
+
 const ConfigSchema = z.object({
-  PEF_SERVER_PORT: z.coerce.number().int().positive().default(4317),
+  PEF_SERVER_PORT: z.coerce.number().int().positive().default(PORT_DEFAULT),
   PEF_SERVER_HOST: z.string().default('127.0.0.1'),
   PEF_DATA_DIR: z.string().default('./data'),
   PEF_CORS_ORIGIN: z.string().default('http://localhost:5173'),
