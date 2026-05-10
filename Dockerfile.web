@@ -1,0 +1,52 @@
+# Multi-stage Dockerfile for the photo-edit-fusion PWA (apps/web).
+# Builds the five workspace packages it depends on, runs Vite to produce static
+# assets, then serves them with a tiny Node static server on Railway's $PORT.
+
+FROM node:20-slim AS base
+ENV PNPM_HOME=/usr/local/share/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+WORKDIR /app
+
+# --- builder ---
+FROM base AS builder
+COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+COPY packages/canvas-engine/package.json packages/canvas-engine/
+COPY packages/cut-tools/package.json packages/cut-tools/
+COPY packages/filters/package.json packages/filters/
+COPY packages/font-match/package.json packages/font-match/
+RUN pnpm install --no-frozen-lockfile \
+    --filter @pef/web... \
+    --filter @pef/shared... \
+    --filter @pef/canvas-engine... \
+    --filter @pef/cut-tools... \
+    --filter @pef/filters... \
+    --filter @pef/font-match...
+COPY apps/web apps/web
+COPY packages/shared packages/shared
+COPY packages/canvas-engine packages/canvas-engine
+COPY packages/cut-tools packages/cut-tools
+COPY packages/filters packages/filters
+COPY packages/font-match packages/font-match
+
+# Vite bakes VITE_* vars at build time. Pass via Railway build args / env.
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
+RUN pnpm --filter @pef/shared build \
+ && pnpm --filter @pef/canvas-engine build \
+ && pnpm --filter @pef/filters build \
+ && pnpm --filter @pef/cut-tools build \
+ && pnpm --filter @pef/font-match build \
+ && pnpm --filter @pef/web build
+
+# --- runner: tiny static server listening on $PORT ---
+FROM node:20-slim AS runner
+ENV NODE_ENV=production
+WORKDIR /srv
+RUN npm install --no-fund --no-audit -g serve@14
+COPY --from=builder /app/apps/web/dist /srv/dist
+EXPOSE 8080
+CMD ["sh", "-c", "serve -s /srv/dist -l tcp://0.0.0.0:${PORT:-8080}"]
