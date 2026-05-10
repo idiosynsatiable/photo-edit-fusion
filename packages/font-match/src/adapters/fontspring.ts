@@ -37,7 +37,7 @@ export class FontspringProvider implements FontIdProvider {
     const form = new FormData();
     form.append(
       'image',
-      new Blob([input.imageBytes], { type: input.contentType }) as unknown as Blob,
+      new Blob([new Uint8Array(input.imageBytes)], { type: input.contentType }),
       'crop.png',
     );
 

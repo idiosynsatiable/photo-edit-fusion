@@ -52,7 +52,7 @@ export async function aiCutRoutes(app: FastifyInstance): Promise<void> {
       const form = new FormData();
       form.append(
         'image_file',
-        new Blob([buf], { type: 'image/png' }) as unknown as Blob,
+        new Blob([new Uint8Array(buf)], { type: 'image/png' }),
         'input.png',
       );
       form.append('size', 'auto');
