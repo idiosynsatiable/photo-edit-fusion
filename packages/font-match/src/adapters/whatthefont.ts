@@ -44,7 +44,7 @@ export class WhatTheFontProvider implements FontIdProvider {
     const form = new FormData();
     form.append(
       'image',
-      new Blob([input.imageBytes as BlobPart], { type: input.contentType }),
+      new Blob([input.imageBytes], { type: input.contentType }) as unknown as Blob,
       'crop.png',
     );
     form.append('limit', String(input.maxResults ?? 10));
