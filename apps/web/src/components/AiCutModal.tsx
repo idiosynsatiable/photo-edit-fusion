@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { postAiCut } from '../lib/api.js';
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../store/editor-store.js';
 import { loadImage } from '../lib/file-utils.js';
 
@@ -12,11 +13,11 @@ interface ApiErrorResp { error: string; reason?: string; integration?: string }
 type AiCutResponse = AiCutResponseRemote | AiCutResponseDelegated | ApiErrorResp;
 
 export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
-  const { doc, selectedLayerId, commit } = useEditorStore((s) => ({
+  const { doc, selectedLayerId, commit } = useEditorStore(useShallow((s) => ({
     doc: s.doc,
     selectedLayerId: s.selectedLayerId,
     commit: s.commit,
-  }));
+  })));
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<'auto' | 'local-onnx' | 'remove-bg'>('auto');
