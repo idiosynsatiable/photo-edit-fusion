@@ -1,5 +1,7 @@
-import { applyPatches, produceWithPatches, type Patch } from 'immer';
+import { applyPatches, enablePatches, produceWithPatches, type Patch } from 'immer';
 import type { Document } from '@pef/shared';
+
+enablePatches();
 
 interface HistoryEntry {
   forward: Patch[];

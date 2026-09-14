@@ -69,7 +69,7 @@ export function binarizeOtsu(img: ImageBuffer): Uint8Array {
   for (let i = 0, j = 0; i < img.data.length; i += 4, j++) {
     const lum = 0.299 * (img.data[i] ?? 0) + 0.587 * (img.data[i + 1] ?? 0) + 0.114 * (img.data[i + 2] ?? 0);
     // text is typically darker than background; mark lum < threshold as foreground
-    out[j] = lum < threshold ? 1 : 0;
+    out[j] = lum <= threshold ? 1 : 0;
   }
   return out;
 }
