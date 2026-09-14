@@ -18,7 +18,7 @@
     "test": "pnpm -r run test",
     "test:e2e": "playwright test",
     "lint": "pnpm -r run lint",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "pnpm -r --filter \"./packages/**\" run build && pnpm -r run typecheck",
     "scan-secrets": "node scripts/scan-secrets.mjs",
     "scan-placeholders": "node scripts/scan-placeholders.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm scan-secrets && pnpm scan-placeholders && pnpm test",

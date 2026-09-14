@@ -1,5 +1,7 @@
-import { applyPatches, produceWithPatches, type Patch } from 'immer';
+import { applyPatches, enablePatches, produceWithPatches, type Patch } from 'immer';
 import type { Document } from '@pef/shared';
+
+enablePatches();
 
 interface HistoryEntry {
   forward: Patch[];
@@ -32,7 +34,9 @@ export class History {
    * undo stack, and clear the redo stack.
    */
   commit(label: string, recipe: (draft: Document) => void): Document {
-    const [next, forward, inverse] = produceWithPatches(this.state, recipe);
+    const [next, forward, inverse] = produceWithPatches(this.state, (draft) => {
+      recipe(draft);
+    });
     if (forward.length === 0) return this.state;
     this.state = next as Document;
     this.undoStack.push({ forward, inverse, label, timestamp: Date.now() });

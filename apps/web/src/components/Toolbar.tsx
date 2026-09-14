@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../store/editor-store.js';
 import { fromProjectFile, toProjectFile } from '@pef/canvas-engine';
 import { downloadBlob, loadImage, readFileAsDataUrl } from '../lib/file-utils.js';
@@ -11,14 +12,14 @@ interface Props {
 export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX.Element {
   const fileRef = useRef<HTMLInputElement>(null);
   const projectRef = useRef<HTMLInputElement>(null);
-  const { addImage, applyDoc, doc, undo, redo, history } = useEditorStore((s) => ({
+  const { addImage, applyDoc, doc, undo, redo, history } = useEditorStore(useShallow((s) => ({
     addImage: s.addImage,
     applyDoc: s.applyDoc,
     doc: s.doc,
     undo: s.undo,
     redo: s.redo,
     history: s.history,
-  }));
+  })));
 
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = e.target.files?.[0];

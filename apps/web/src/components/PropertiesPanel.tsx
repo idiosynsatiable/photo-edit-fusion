@@ -1,15 +1,16 @@
 import React from 'react';
 import { BLEND_MODES, type BlendMode, type Layer } from '@pef/shared';
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../store/editor-store.js';
 
 export function PropertiesPanel(): React.JSX.Element {
-  const { doc, selectedLayerId, setBlend, setOpacity, patchLayer } = useEditorStore((s) => ({
+  const { doc, selectedLayerId, setBlend, setOpacity, patchLayer } = useEditorStore(useShallow((s) => ({
     doc: s.doc,
     selectedLayerId: s.selectedLayerId,
     setBlend: s.setBlend,
     setOpacity: s.setOpacity,
     patchLayer: s.patchLayer,
-  }));
+  })));
 
   const layer: Layer | undefined = selectedLayerId ? doc.layers[selectedLayerId] : undefined;
 

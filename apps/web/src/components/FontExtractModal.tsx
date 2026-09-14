@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { postFontIdentify } from '../lib/api.js';
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../store/editor-store.js';
 import { loadGoogleFontByUrl } from '../lib/font-loader.js';
 import type { FontMatch } from '@pef/shared';
@@ -12,13 +13,13 @@ interface Props {
 interface CropRect { x: number; y: number; w: number; h: number }
 
 export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | null {
-  const { doc, addText, setFontMatches, lastFontMatches, lastFontMatchProvider } = useEditorStore((s) => ({
+  const { doc, addText, setFontMatches, lastFontMatches, lastFontMatchProvider } = useEditorStore(useShallow((s) => ({
     doc: s.doc,
     addText: s.addText,
     setFontMatches: s.setFontMatches,
     lastFontMatches: s.lastFontMatches,
     lastFontMatchProvider: s.lastFontMatchProvider,
-  }));
+  })));
 
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);

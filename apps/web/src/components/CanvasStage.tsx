@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../store/editor-store.js';
 import { hitTest } from '@pef/canvas-engine';
 import { rasterizePolygon, magicWand, applyMaskToImage } from '@pef/cut-tools';
@@ -13,7 +14,7 @@ export function CanvasStage(): React.JSX.Element {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const bitmapsRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  const { doc, zoom, setZoom, activeTool, selectedLayerId, selectLayer, patchLayer, commit } = useEditorStore((s) => ({
+  const { doc, zoom, setZoom, activeTool, selectedLayerId, selectLayer, patchLayer, commit } = useEditorStore(useShallow((s) => ({
     doc: s.doc,
     zoom: s.zoom,
     setZoom: s.setZoom,
@@ -22,7 +23,7 @@ export function CanvasStage(): React.JSX.Element {
     selectLayer: s.selectLayer,
     patchLayer: s.patchLayer,
     commit: s.commit,
-  }));
+  })));
 
   const [lassoPoints, setLassoPoints] = useState<Vec2[]>([]);
   const [drawing, setDrawing] = useState(false);

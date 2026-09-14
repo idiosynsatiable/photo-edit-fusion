@@ -1,8 +1,9 @@
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../store/editor-store.js';
 
 export function LayersPanel(): React.JSX.Element {
-  const { doc, selectedLayerId, selectLayer, setVisible, setLocked, removeLayer, duplicate, reorder } = useEditorStore((s) => ({
+  const { doc, selectedLayerId, selectLayer, setVisible, setLocked, removeLayer, duplicate, reorder } = useEditorStore(useShallow((s) => ({
     doc: s.doc,
     selectedLayerId: s.selectedLayerId,
     selectLayer: s.selectLayer,
@@ -11,7 +12,7 @@ export function LayersPanel(): React.JSX.Element {
     removeLayer: s.removeLayer,
     duplicate: s.duplicate,
     reorder: s.reorder,
-  }));
+  })));
 
   // top-down rendering = reverse of layerOrder so top layers appear first in the panel
   const orderedTopDown = [...doc.layerOrder].reverse();

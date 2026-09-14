@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../store/editor-store.js';
 import { getIntegrations, type IntegrationStatus } from '../lib/api.js';
 
 export function StatusBar(): React.JSX.Element {
-  const { doc, zoom } = useEditorStore((s) => ({ doc: s.doc, zoom: s.zoom }));
+  const { doc, zoom } = useEditorStore(useShallow((s) => ({ doc: s.doc, zoom: s.zoom })));
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
 
   useEffect(() => {
