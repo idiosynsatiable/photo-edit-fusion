@@ -20,13 +20,6 @@ jobs:
       - name: Check out build payload
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: handblend-release/package-lock.json
-
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -40,6 +33,13 @@ jobs:
           cat .codex/handblend-ci/part-* | base64 --decode > handblend-release.tar.gz
           echo "4572b5a4335b075f0427c46fe173e2f56805a51e2ed2b3424f9791e9bff8745c  handblend-release.tar.gz" | sha256sum --check
           tar -xzf handblend-release.tar.gz -C handblend-release
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: handblend-release/package-lock.json
 
       - name: Install dependencies
         working-directory: handblend-release
