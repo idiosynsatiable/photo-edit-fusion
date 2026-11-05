@@ -12,13 +12,11 @@ interface Props {
 interface CropRect { x: number; y: number; w: number; h: number }
 
 export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | null {
-  const { doc, addText, setFontMatches, lastFontMatches, lastFontMatchProvider } = useEditorStore((s) => ({
-    doc: s.doc,
-    addText: s.addText,
-    setFontMatches: s.setFontMatches,
-    lastFontMatches: s.lastFontMatches,
-    lastFontMatchProvider: s.lastFontMatchProvider,
-  }));
+  const doc = useEditorStore((s) => s.doc);
+  const addText = useEditorStore((s) => s.addText);
+  const setFontMatches = useEditorStore((s) => s.setFontMatches);
+  const lastFontMatches = useEditorStore((s) => s.lastFontMatches);
+  const lastFontMatchProvider = useEditorStore((s) => s.lastFontMatchProvider);
 
   const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
