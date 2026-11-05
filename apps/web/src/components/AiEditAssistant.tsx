@@ -61,7 +61,7 @@ export function AiEditAssistant(): React.JSX.Element {
     setBusy(true); setError(''); setStage('Building a reviewable edit plan…');
     try {
       const result = await postAiPlan(instruction, analysis, true, plan?.operations ?? []);
-      if ('error' in result) throw new Error(result.message ?? result.error);
+      if ('error' in result) throw new Error(result.error);
       setPlan(result.plan);
       setStage('Plan ready. Review it before any edits are executed.');
     } catch (e) {
@@ -81,7 +81,7 @@ export function AiEditAssistant(): React.JSX.Element {
         instruction,
         plan,
       );
-      if ('error' in result) throw new Error(result.message ?? result.error);
+      if ('error' in result) throw new Error(result.error);
       const outputUrl = 'data:' + result.mimeType + ';base64,' + result.imageBase64;
       const outputImage = new Image();
       await new Promise<void>((resolve, reject) => {
