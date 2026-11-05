@@ -6,6 +6,7 @@ import type { Config } from './config.js';
 import { healthRoutes } from './routes/health.js';
 import { fontIdRoutes } from './routes/font-id.js';
 import { aiCutRoutes } from './routes/ai-cut.js';
+import { aiEditRoutes } from './routes/ai-edit.js';
 import { projectRoutes } from './routes/project.js';
 
 export async function buildServer(cfg: Config): Promise<FastifyInstance> {
@@ -39,6 +40,7 @@ export async function buildServer(cfg: Config): Promise<FastifyInstance> {
   await app.register(healthRoutes);
   await app.register(fontIdRoutes);
   await app.register(aiCutRoutes);
+  await app.register(aiEditRoutes);
   await app.register(projectRoutes);
 
   return app;
