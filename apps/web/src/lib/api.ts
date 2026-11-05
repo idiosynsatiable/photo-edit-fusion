@@ -49,3 +49,35 @@ export async function listProjects(): Promise<Array<{ id: string; modifiedAt: st
   const json = (await r.json()) as { projects: Array<{ id: string; modifiedAt: string; bytes: number }> };
   return json.projects;
 }
+
+import type { EditPlan, SceneAnalysis } from '@pef/shared';
+
+export async function postAiAnalyze(
+  imageBase64: string,
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
+  signal?: AbortSignal,
+): Promise<{ analysis: SceneAnalysis } | ApiError> {
+  const r = await fetch(`${baseUrl}/api/ai-edit/analyze`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ imageBase64, mimeType }),
+    signal,
+  });
+  return (await r.json()) as { analysis: SceneAnalysis } | ApiError;
+}
+
+export async function postAiPlan(
+  instruction: string,
+  analysis: SceneAnalysis,
+  preserveIdentity = true,
+  priorOperations: EditPlan['operations'] = [],
+  signal?: AbortSignal,
+): Promise<{ plan: EditPlan } | ApiError> {
+  const r = await fetch(`${baseUrl}/api/ai-edit/plan`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ instruction, analysis, preserveIdentity, priorOperations }),
+    signal,
+  });
+  return (await r.json()) as { plan: EditPlan } | ApiError;
+}
