@@ -27,6 +27,7 @@ export function AiEditAssistant(): React.JSX.Element {
   const [instruction, setInstruction] = useState('');
   const [plan, setPlan] = useState<EditPlan | null>(null);
   const [busy, setBusy] = useState(false);
+  const [providerConsent, setProviderConsent] = useState(false);
   const [stage, setStage] = useState('');
   const [error, setError] = useState('');
 
@@ -153,14 +154,15 @@ export function AiEditAssistant(): React.JSX.Element {
           accept="image/png,image/jpeg,image/webp"
           onChange={(event) => {
             const next = event.target.files?.[0] ?? null;
-            setImage(next); setAnalysis(null); setPlan(null); setDataUrl(null); setGeneratedLayerIds([]); setOriginalLayerId(null); setActiveMimeType((next?.type || 'image/png') as 'image/png' | 'image/jpeg' | 'image/webp'); setError(''); setStage('');
+            setImage(next); setAnalysis(null); setPlan(null); setDataUrl(null); setGeneratedLayerIds([]); setOriginalLayerId(null); setActiveMimeType((next?.type || 'image/png') as 'image/png' | 'image/jpeg' | 'image/webp'); setProviderConsent(false); setError(''); setStage('');
           }}
         />
       </label>
 
       {dataUrl && <img src={dataUrl} alt="Selected image preview" className="max-h-36 max-w-full rounded border border-ink-700 object-contain" />}
 
-      <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-40" disabled={!image || busy} onClick={() => void scan()}>
+      <label className="flex items-start gap-2 text-[11px] text-zinc-400"><input type="checkbox" checked={providerConsent} onChange={(event) => setProviderConsent(event.target.checked)} className="mt-0.5" /><span>I consent to sending this image and my editing instructions to Google Gemini for AI processing. I understand processing is performed by the provider under its terms.</span></label>
+      <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-40" disabled={!image || !providerConsent || busy} onClick={() => void scan()}>
         {busy && !analysis ? 'Scanning…' : 'Scan entire image'}
       </button>
 
@@ -208,7 +210,7 @@ export function AiEditAssistant(): React.JSX.Element {
               </li>
             ))}
           </ol>
-          <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" disabled={busy || !dataUrl || !image} onClick={() => void executePlan()}>Approve & apply edits</button>
+          <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" disabled={busy || !dataUrl || !image || !providerConsent} onClick={() => void executePlan()}>Approve & apply edits</button>
           <p className="text-[10px] text-zinc-400">Applying creates a separate result layer. The original image is retained for comparison and undo.</p>
         </div>
       )}
