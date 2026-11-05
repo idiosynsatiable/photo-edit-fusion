@@ -15,8 +15,9 @@ function fileAsDataUrl(file: File): Promise<string> {
 
 export function AiEditAssistant(): React.JSX.Element {
   const [image, setImage] = useState<File | null>(null);
-  const [generatedLayerId, setGeneratedLayerId] = useState<string | null>(null);
+  const [generatedLayerIds, setGeneratedLayerIds] = useState<string[]>([]);
   const [originalLayerId, setOriginalLayerId] = useState<string | null>(null);
+  const [activeMimeType, setActiveMimeType] = useState<'image/png' | 'image/jpeg' | 'image/webp'>('image/png');
   const [showEdited, setShowEdited] = useState(true);
   const addImage = useEditorStore((state) => state.addImage);
   const applyDoc = useEditorStore((state) => state.applyDoc);
@@ -89,11 +90,12 @@ export function AiEditAssistant(): React.JSX.Element {
     try {
       const result = await postAiExecute(
         dataUrl,
-        image.type as 'image/png' | 'image/jpeg' | 'image/webp',
+        activeMimeType,
         instruction,
         plan,
       );
       if ('error' in result) throw new Error(result.error);
+      setStage('Decoding the generated image…');
       const outputUrl = 'data:' + result.mimeType + ';base64,' + result.imageBase64;
       const outputImage = new Image();
       await new Promise<void>((resolve, reject) => {
@@ -101,6 +103,7 @@ export function AiEditAssistant(): React.JSX.Element {
         outputImage.onerror = () => reject(new Error('Generated image could not be decoded'));
         outputImage.src = outputUrl;
       });
+      setStage('Adding the result as a separate editable layer…');
       const bitmapId = 'ai_' + crypto.randomUUID();
       addImage({
         bitmapId,
@@ -111,9 +114,12 @@ export function AiEditAssistant(): React.JSX.Element {
       });
       const latest = useEditorStore.getState().doc;
       const layerId = [...latest.layerOrder].reverse().find((id) => latest.layers[id]?.type === 'image' && latest.layers[id]?.name === 'AI Edited Result');
-      if (layerId) setGeneratedLayerId(layerId);
+      if (layerId) setGeneratedLayerIds((current) => [...current, layerId]);
+      setDataUrl(outputUrl);
+      setActiveMimeType(result.mimeType as 'image/png' | 'image/jpeg' | 'image/webp');
+      if (originalLayerId) setVisible(originalLayerId, false);
       setShowEdited(true);
-      setStage('Edit complete. The generated result is a separate editable image layer; your original remains underneath.');
+      setStage('Edit complete. The latest result is now the active source for follow-up instructions. Earlier results remain in the layer history.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Image edit failed');
       setStage('');
@@ -121,8 +127,10 @@ export function AiEditAssistant(): React.JSX.Element {
   }
 
   function compare(showEditedResult: boolean) {
-    if (!generatedLayerId) return;
-    setVisible(generatedLayerId, showEditedResult);
+    if (!generatedLayerIds.length) return;
+    if (originalLayerId) setVisible(originalLayerId, !showEditedResult);
+    const latestId = generatedLayerIds[generatedLayerIds.length - 1];
+    for (const id of generatedLayerIds) setVisible(id, showEditedResult && id === latestId);
     setShowEdited(showEditedResult);
   }
 
@@ -144,7 +152,7 @@ export function AiEditAssistant(): React.JSX.Element {
           accept="image/png,image/jpeg,image/webp"
           onChange={(event) => {
             const next = event.target.files?.[0] ?? null;
-            setImage(next); setAnalysis(null); setPlan(null); setDataUrl(null); setGeneratedLayerId(null); setOriginalLayerId(null); setError(''); setStage('');
+            setImage(next); setAnalysis(null); setPlan(null); setDataUrl(null); setGeneratedLayerIds([]); setOriginalLayerId(null); setActiveMimeType((next?.type || 'image/png') as 'image/png' | 'image/jpeg' | 'image/webp'); setError(''); setStage('');
           }}
         />
       </label>
@@ -182,7 +190,7 @@ export function AiEditAssistant(): React.JSX.Element {
         {busy && analysis ? 'Planning…' : 'Generate edit plan'}
       </button>
 
-      {generatedLayerId && <div className="flex gap-2"><button className="rounded border border-ink-600 px-2 py-1 text-xs" onClick={() => compare(false)} disabled={!showEdited}>Show original</button><button className="rounded border border-ink-600 px-2 py-1 text-xs" onClick={() => compare(true)} disabled={showEdited}>Show edited</button></div>}
+      {generatedLayerIds.length > 0 && <div className="flex gap-2"><button className="rounded border border-ink-600 px-2 py-1 text-xs" onClick={() => compare(false)} disabled={!showEdited}>Show original</button><button className="rounded border border-ink-600 px-2 py-1 text-xs" onClick={() => compare(true)} disabled={showEdited}>Show latest edit</button></div>}
       {stage && <p role="status" className="text-xs text-emerald-300">{stage}</p>}
       {error && <p role="alert" className="text-xs text-red-300">{error}</p>}
 
