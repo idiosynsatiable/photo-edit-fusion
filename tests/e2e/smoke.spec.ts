@@ -40,6 +40,11 @@ test('keyboard shortcut V switches to move tool', async ({ page }) => {
 });
 
 test('AI Studio requires explicit Gemini consent before sending an image', async ({ page }) => {
+  await page.route('**/api/integrations', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ integrations: [{ name: 'gemini-ai-edit', enabled: true }] }),
+  }));
   await page.goto('/');
   const panel = page.locator('section[aria-label="AI editing assistant"]');
   await expect(panel.getByText('Photo Edit Fusion Ω · AI Studio')).toBeVisible();
