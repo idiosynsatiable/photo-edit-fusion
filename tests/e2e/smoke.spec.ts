@@ -38,3 +38,18 @@ test('keyboard shortcut V switches to move tool', async ({ page }) => {
   const moveBtn = page.getByLabel('Move (V)');
   await expect(moveBtn).toBeVisible();
 });
+
+test('AI Studio requires explicit Gemini consent before sending an image', async ({ page }) => {
+  await page.goto('/');
+  const panel = page.locator('section[aria-label="AI editing assistant"]');
+  await expect(panel.getByText('Photo Edit Fusion Ω · AI Studio')).toBeVisible();
+  await panel.locator('input[type="file"]').setInputFiles({
+    name: 'pixel.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/XioAAAAASUVORK5CYII=', 'base64'),
+  });
+  const scan = panel.getByRole('button', { name: 'Scan entire image' });
+  await expect(scan).toBeDisabled();
+  await panel.getByLabel(/I consent to sending this image/).check();
+  await expect(scan).toBeEnabled();
+});
