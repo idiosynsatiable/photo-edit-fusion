@@ -71,6 +71,7 @@ export function AiEditAssistant(): React.JSX.Element {
   const setVisible = useEditorStore((state) => state.setVisible);
   const commit = useEditorStore((state) => state.commit);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [originalDataUrl, setOriginalDataUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<SceneAnalysis | null>(null);
   const [instruction, setInstruction] = useState('');
   const [plan, setPlan] = useState<EditPlan | null>(null);
@@ -85,6 +86,7 @@ export function AiEditAssistant(): React.JSX.Element {
     try {
       const url = await fileAsDataUrl(image);
       setDataUrl(url);
+      if (!originalDataUrl) setOriginalDataUrl(url);
       if (!originalLayerId) {
         const sourceImage = new Image();
         await new Promise<void>((resolve, reject) => {
@@ -213,12 +215,24 @@ export function AiEditAssistant(): React.JSX.Element {
           accept="image/png,image/jpeg,image/webp"
           onChange={(event) => {
             const next = event.target.files?.[0] ?? null;
-            setImage(next); setAnalysis(null); setPlan(null); setDataUrl(null); setGeneratedLayerIds([]); setOriginalLayerId(null); setActiveMimeType((next?.type || 'image/png') as 'image/png' | 'image/jpeg' | 'image/webp'); setProviderConsent(false); setError(''); setStage('');
+            setImage(next); setAnalysis(null); setPlan(null); setDataUrl(null); setOriginalDataUrl(null); setGeneratedLayerIds([]); setOriginalLayerId(null); setActiveMimeType((next?.type || 'image/png') as 'image/png' | 'image/jpeg' | 'image/webp'); setProviderConsent(false); setError(''); setStage('');
           }}
         />
       </label>
 
-      {dataUrl && <img src={dataUrl} alt="Selected image preview" className="max-h-36 max-w-full rounded border border-ink-700 object-contain" />}
+      {dataUrl && <img src={dataUrl} alt="Active image preview" className="max-h-36 max-w-full rounded border border-ink-700 object-contain" />}
+      {generatedLayerIds.length > 0 && originalDataUrl && dataUrl && (
+        <div className="grid grid-cols-2 gap-2" aria-label="Before and after comparison">
+          <figure className="min-w-0">
+            <img src={originalDataUrl} alt="Before edit" className="max-h-40 w-full rounded border border-ink-700 object-contain" />
+            <figcaption className="mt-1 text-center text-[10px] text-zinc-400">Before</figcaption>
+          </figure>
+          <figure className="min-w-0">
+            <img src={dataUrl} alt="After latest edit" className="max-h-40 w-full rounded border border-ink-700 object-contain" />
+            <figcaption className="mt-1 text-center text-[10px] text-zinc-400">After · latest</figcaption>
+          </figure>
+        </div>
+      )}
 
       <label className="flex items-start gap-2 text-[11px] text-zinc-400"><input type="checkbox" checked={providerConsent} onChange={(event) => setProviderConsent(event.target.checked)} className="mt-0.5" /><span>I consent to sending this image and my editing instructions to Google Gemini for AI processing. I understand processing is performed by the provider under its terms.</span></label>
       <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-40" disabled={!image || !providerConsent || busy} onClick={() => void scan()}>
