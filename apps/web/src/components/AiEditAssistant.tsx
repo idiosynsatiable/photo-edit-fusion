@@ -93,6 +93,7 @@ export function AiEditAssistant(): React.JSX.Element {
         activeMimeType,
         instruction,
         plan,
+        analysis,
       );
       if ('error' in result) throw new Error(result.error);
       setStage('Decoding the generated image…');
