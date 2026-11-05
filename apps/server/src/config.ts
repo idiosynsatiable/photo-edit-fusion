@@ -21,7 +21,7 @@ const ConfigSchema = z.object({
   REMOVE_BG_API_KEY: z.string().optional(),
   REMOVE_BG_API_URL: z.string().default('https://api.remove.bg/v1.0/removebg'),
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),\n  GEMINI_IMAGE_MODEL: z.string().default('gemini-2.5-flash-image'),
   GEMINI_TIMEOUT_MS: z.coerce.number().int().positive().default(45000),
   TITAN_API_URL: z.string().url().optional(),
   TITAN_API_KEY: z.string().optional(),
