@@ -54,6 +54,14 @@ jobs:
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
 
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: photo-edit-fusion-android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Smoke test on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -67,11 +75,3 @@ jobs:
             adb shell am start -n com.idiosynsatiable.photoeditfusion/.MainActivity
             sleep 12
             adb shell pidof com.idiosynsatiable.photoeditfusion
-
-      - name: Upload installable APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: photo-edit-fusion-android-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 30
