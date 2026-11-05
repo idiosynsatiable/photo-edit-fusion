@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { EditPlan, SceneAnalysis } from '@pef/shared';
-import { postAiAnalyze, postAiPlan } from '../lib/api.js';
+import { postAiAnalyze, postAiPlan, postAiExecute } from '../lib/api.js';
+import { useEditorStore } from '../store/editor-store.js';
 
 function fileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -13,6 +14,10 @@ function fileAsDataUrl(file: File): Promise<string> {
 
 export function AiEditAssistant(): React.JSX.Element {
   const [image, setImage] = useState<File | null>(null);
+  const [generatedLayerId, setGeneratedLayerId] = useState<string | null>(null);
+  const [showEdited, setShowEdited] = useState(true);
+  const addImage = useEditorStore((state) => state.addImage);
+  const setVisible = useEditorStore((state) => state.setVisible);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<SceneAnalysis | null>(null);
   const [instruction, setInstruction] = useState('');
@@ -49,6 +54,50 @@ export function AiEditAssistant(): React.JSX.Element {
       setError(e instanceof Error ? e.message : 'Plan generation failed');
       setStage('');
     } finally { setBusy(false); }
+  }
+
+
+  async function executePlan() {
+    if (!image || !dataUrl || !analysis || !plan) return;
+    setBusy(true); setError(''); setStage('Applying approved generative edits…');
+    try {
+      const result = await postAiExecute(
+        dataUrl,
+        image.type as 'image/png' | 'image/jpeg' | 'image/webp',
+        instruction,
+        plan,
+      );
+      if ('error' in result) throw new Error(result.message ?? result.error);
+      const outputUrl = 'data:' + result.mimeType + ';base64,' + result.imageBase64;
+      const outputImage = new Image();
+      await new Promise<void>((resolve, reject) => {
+        outputImage.onload = () => resolve();
+        outputImage.onerror = () => reject(new Error('Generated image could not be decoded'));
+        outputImage.src = outputUrl;
+      });
+      const bitmapId = 'ai_' + crypto.randomUUID();
+      addImage({
+        bitmapId,
+        bitmapDataUrl: outputUrl,
+        sourceWidth: outputImage.naturalWidth,
+        sourceHeight: outputImage.naturalHeight,
+        name: 'AI Edited Result',
+      });
+      const latest = useEditorStore.getState().doc;
+      const layerId = [...latest.layerOrder].reverse().find((id) => latest.layers[id]?.type === 'image' && latest.layers[id]?.name === 'AI Edited Result');
+      if (layerId) setGeneratedLayerId(layerId);
+      setShowEdited(true);
+      setStage('Edit complete. The generated result is a separate editable image layer; your original remains underneath.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Image edit failed');
+      setStage('');
+    } finally { setBusy(false); }
+  }
+
+  function compare(showEditedResult: boolean) {
+    if (!generatedLayerId) return;
+    setVisible(generatedLayerId, showEditedResult);
+    setShowEdited(showEditedResult);
   }
 
   return (
@@ -107,6 +156,7 @@ export function AiEditAssistant(): React.JSX.Element {
         {busy && analysis ? 'Planning…' : 'Generate edit plan'}
       </button>
 
+      {generatedLayerId && <div className="flex gap-2"><button className="rounded border border-ink-600 px-2 py-1 text-xs" onClick={() => compare(false)} disabled={!showEdited}>Show original</button><button className="rounded border border-ink-600 px-2 py-1 text-xs" onClick={() => compare(true)} disabled={showEdited}>Show edited</button></div>}
       {stage && <p role="status" className="text-xs text-emerald-300">{stage}</p>}
       {error && <p role="alert" className="text-xs text-red-300">{error}</p>}
 
@@ -123,7 +173,8 @@ export function AiEditAssistant(): React.JSX.Element {
               </li>
             ))}
           </ol>
-          <p className="text-[10px] text-amber-300">Planning is connected. Applying generative operations to editable layers is a separate implementation gate and is not yet enabled.</p>
+          <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" disabled={busy || !dataUrl || !image} onClick={() => void executePlan()}>Approve & apply edits</button>
+          <p className="text-[10px] text-zinc-400">Applying creates a separate result layer. The original image is retained for comparison and undo.</p>
         </div>
       )}
     </section>
