@@ -86,3 +86,13 @@ export type EditPlan = z.infer<typeof EditPlanSchema>;
 export type AiAnalyzeRequest = z.infer<typeof AiAnalyzeRequestSchema>;
 export type AiPlanRequest = z.infer<typeof AiPlanRequestSchema>;
 export type AiExecutionProgress = z.infer<typeof AiExecutionProgressSchema>;
+
+
+export const AiExecuteRequestSchema = z.object({
+  imageBase64: z.string().min(100),
+  mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+  instruction: z.string().min(1).max(4000),
+  plan: EditPlanSchema,
+  approved: z.literal(true),
+});
+export type AiExecuteRequest = z.infer<typeof AiExecuteRequestSchema>;
