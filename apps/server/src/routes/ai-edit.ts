@@ -153,13 +153,19 @@ Use only region IDs from the analysis. Preserve faces by default. Set requiresCo
     }
 
     const operationBrief = body.plan.operations.map((op) =>
-      `- ${op.title}: ${op.description}. Prompt: ${op.prompt ?? op.description}`
-    ).join('\n');
+      `- ${op.title}: ${op.description}. Prompt: ${op.prompt ?? op.description}. Target region IDs: ${op.targetRegionIds.join(', ') || 'not specified'}`
+    ).join('\\n');
+    const targetRegionIds = new Set(body.plan.operations.flatMap((op) => op.targetRegionIds));
+    const targetRegions = body.analysis.regions.filter((region) => targetRegionIds.has(region.id));
+    const protectedRegions = body.analysis.regions.filter((region) => region.protected || body.plan.identityProtection.protectedRegionIds.includes(region.id));
     const prompt = `Edit the supplied image according to the user's explicitly approved plan.
 User instruction: ${body.instruction}
+Scene analysis: ${body.analysis.summary}
 Approved operations:
 ${operationBrief}
-Identity protection: preserve the original identity, face geometry, facial features, skin texture, expression, and all protected regions. Do not beautify, age, de-age, or alter a person's identity. Keep all unrelated pixels and composition as close to the source as possible. Apply only the requested changes. Return the edited image, not instructions. If an operation is ambiguous, prefer a conservative minimal edit.`;
+Target region metadata (normalized 0..1 bounds): ${JSON.stringify(targetRegions)}
+Protected region metadata (do not alter): ${JSON.stringify(protectedRegions)}
+Identity protection: preserve the original identity, face geometry, facial features, skin texture, expression, and all protected regions. Do not beautify, age, de-age, or alter a person's identity. Keep all unrelated pixels and composition as close to the source as possible. Apply only the requested changes. Treat target region bounds as guidance and do not modify protected regions. Return the edited image, not instructions. If an operation is ambiguous, prefer a conservative minimal edit.`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), app.config.GEMINI_TIMEOUT_MS * 2);
