@@ -65,7 +65,30 @@ function drawImageLayer(ctx: CanvasRenderingContext2D, layer: ImageLayer, bitmap
   if (!img) return;
   const w = layer.sourceWidth;
   const h = layer.sourceHeight;
-  ctx.drawImage(img, -w * layer.transform.anchor.x, -h * layer.transform.anchor.y, w, h);
+  const x = -w * layer.transform.anchor.x;
+  const y = -h * layer.transform.anchor.y;
+  const mask = layer.maskBitmapId ? bitmaps.get(layer.maskBitmapId) : undefined;
+
+  if (!mask) {
+    ctx.drawImage(img, x, y, w, h);
+    return;
+  }
+
+  // Apply raster masks non-destructively in source-pixel space. The original
+  // bitmap remains untouched, and changing/removing maskBitmapId restores it.
+  const masked = document.createElement('canvas');
+  masked.width = w;
+  masked.height = h;
+  const maskCtx = masked.getContext('2d');
+  if (!maskCtx) {
+    ctx.drawImage(img, x, y, w, h);
+    return;
+  }
+  maskCtx.drawImage(img, 0, 0, w, h);
+  maskCtx.globalCompositeOperation = 'destination-in';
+  maskCtx.drawImage(mask, 0, 0, w, h);
+  maskCtx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(masked, x, y, w, h);
 }
 
 function drawTextLayer(ctx: CanvasRenderingContext2D, layer: TextLayer): void {
