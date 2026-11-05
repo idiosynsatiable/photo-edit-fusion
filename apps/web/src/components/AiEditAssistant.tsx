@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { EditPlan, SceneAnalysis } from '@pef/shared';
 import { postAiAnalyze, postAiPlan, postAiExecute } from '../lib/api.js';
 import { useEditorStore } from '../store/editor-store.js';
+import { createDocument } from '@pef/canvas-engine';
 
 function fileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,6 +19,7 @@ export function AiEditAssistant(): React.JSX.Element {
   const [originalLayerId, setOriginalLayerId] = useState<string | null>(null);
   const [showEdited, setShowEdited] = useState(true);
   const addImage = useEditorStore((state) => state.addImage);
+  const applyDoc = useEditorStore((state) => state.applyDoc);
   const setVisible = useEditorStore((state) => state.setVisible);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<SceneAnalysis | null>(null);
@@ -40,6 +42,16 @@ export function AiEditAssistant(): React.JSX.Element {
           sourceImage.onerror = () => reject(new Error('Source image could not be decoded'));
           sourceImage.src = url;
         });
+        const currentDocument = useEditorStore.getState().doc;
+        if (currentDocument.layerOrder.length === 0 && currentDocument.name === 'Untitled') {
+          const nextDocument = createDocument({
+            name: image.name.replace(/\\.[^.]+$/, '') || 'Untitled',
+            width: sourceImage.naturalWidth,
+            height: sourceImage.naturalHeight,
+          });
+          nextDocument.background = [0, 0, 0, 0];
+          applyDoc(nextDocument);
+        }
         const sourceBitmapId = 'source_' + crypto.randomUUID();
         addImage({ bitmapId: sourceBitmapId, bitmapDataUrl: url, sourceWidth: sourceImage.naturalWidth, sourceHeight: sourceImage.naturalHeight, name: image.name });
         const latest = useEditorStore.getState().doc;
