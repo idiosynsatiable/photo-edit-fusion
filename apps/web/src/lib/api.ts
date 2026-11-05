@@ -81,3 +81,28 @@ export async function postAiPlan(
   });
   return (await r.json()) as { plan: EditPlan } | ApiError;
 }
+
+
+export interface AiExecuteResult {
+  imageBase64: string;
+  mimeType: string;
+  text?: string;
+  provider: string;
+  completedAt: string;
+}
+
+export async function postAiExecute(
+  imageBase64: string,
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
+  instruction: string,
+  plan: EditPlan,
+  signal?: AbortSignal,
+): Promise<AiExecuteResult | ApiError> {
+  const r = await fetch(`${baseUrl}/api/ai-edit/execute`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ imageBase64, mimeType, instruction, plan, approved: true }),
+    signal,
+  });
+  return (await r.json()) as AiExecuteResult | ApiError;
+}
