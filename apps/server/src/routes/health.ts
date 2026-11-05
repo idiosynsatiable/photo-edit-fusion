@@ -28,6 +28,16 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
       },
       { name: 'google-fonts-similarity', enabled: true },
       { name: 'local-onnx-cut', enabled: true },
+      {
+        name: 'gemini-ai-edit',
+        enabled: !!app.config.GEMINI_API_KEY,
+        reason: app.config.GEMINI_API_KEY ? undefined : 'GEMINI_API_KEY not set',
+      },
+      {
+        name: 'titan-orchestrator',
+        enabled: !!app.config.TITAN_API_URL && !!app.config.TITAN_API_KEY,
+        reason: app.config.TITAN_API_URL && app.config.TITAN_API_KEY ? undefined : 'TITAN_API_URL and TITAN_API_KEY not set',
+      },
     ];
     return { integrations: statuses };
   });
