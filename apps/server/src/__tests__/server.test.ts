@@ -238,6 +238,22 @@ describe('POST /api/ai-edit/execute', () => {
           requiresApproval: true,
           createdAt: new Date().toISOString(),
         },
+        analysis: {
+          imageWidth: 100,
+          imageHeight: 100,
+          summary: 'A sign appears in the background.',
+          regions: [{
+            id: 'sign-1',
+            kind: 'object',
+            label: 'sign',
+            confidence: 0.9,
+            bounds: { x: 0.2, y: 0.2, width: 0.3, height: 0.3 },
+            protected: false,
+          }],
+          warnings: [],
+          provider: 'gemini',
+          analyzedAt: new Date().toISOString(),
+        },
       },
     });
     expect(r.statusCode).toBe(503);
