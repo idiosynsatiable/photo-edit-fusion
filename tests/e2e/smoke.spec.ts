@@ -3,7 +3,8 @@ import { test, expect } from '@playwright/test';
 test('app loads and shows toolbar', async ({ page }) => {
   page.on('pageerror', (error) => console.log('E2E_PAGE_ERROR:', error.stack ?? error.message));
   page.on('console', (message) => { if (message.type() === 'error') console.log('E2E_BROWSER_ERROR:', message.text()); });
-  await page.goto('/');
+  const response = await page.goto('/');
+  console.log('E2E_NAV_STATUS:', response?.status());
   console.log('E2E_BODY_TEXT:', await page.locator('body').innerText());
   console.log('E2E_ROOT_HTML:', (await page.locator('#root').innerHTML()).slice(0, 3000));
   await expect(page.getByText('Photo Edit Fusion')).toBeVisible();
