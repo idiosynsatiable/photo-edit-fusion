@@ -18,7 +18,7 @@ export async function buildServer(cfg: Config): Promise<FastifyInstance> {
           ? undefined
           : { target: 'pino/file', options: { destination: 1 } },
     },
-    bodyLimit: cfg.PEF_MAX_UPLOAD_BYTES,
+    // JSON base64 expands binary images by roughly 4/3; leave room for the envelope too.\n    bodyLimit: Math.ceil(cfg.PEF_MAX_UPLOAD_BYTES * 4 / 3) + 1024 * 1024,
   });
 
   await app.register(cors, {
