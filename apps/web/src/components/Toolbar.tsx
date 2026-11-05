@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useEditorStore } from '../store/editor-store.js';
-import { fromProjectFile, toProjectFile } from '@pef/canvas-engine';
+import { createDocument, fromProjectFile, toProjectFile } from '@pef/canvas-engine';
 import { downloadBlob, loadImage, readFileAsDataUrl } from '../lib/file-utils.js';
 
 interface Props {
@@ -25,6 +25,13 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
     if (!file) return;
     const dataUrl = await readFileAsDataUrl(file);
     const img = await loadImage(dataUrl);
+    const nextDocument = createDocument({
+      name: file.name.replace(/\.[^.]+$/, '') || 'Untitled',
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+    });
+    nextDocument.background = [0, 0, 0, 0];
+    applyDoc(nextDocument);
     addImage({
       bitmapId: `b_${Date.now()}`,
       bitmapDataUrl: dataUrl,
