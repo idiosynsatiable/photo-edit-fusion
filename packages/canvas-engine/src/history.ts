@@ -34,7 +34,10 @@ export class History {
    * undo stack, and clear the redo stack.
    */
   commit(label: string, recipe: (draft: Document) => void): Document {
-    const [next, forward, inverse] = produceWithPatches(this.state, (draft) => {\n      // Ignore accidental return values from concise assignment callbacks.\n      recipe(draft);\n    });
+    const [next, forward, inverse] = produceWithPatches(this.state, (draft) => {
+      // Ignore accidental return values from concise assignment callbacks.
+      recipe(draft);
+    });
     if (forward.length === 0) return this.state;
     this.state = next as Document;
     this.undoStack.push({ forward, inverse, label, timestamp: Date.now() });
