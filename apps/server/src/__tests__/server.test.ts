@@ -19,6 +19,8 @@ const cfg: Config = {
   WHATTHEFONT_API_URL: 'https://example.invalid/wtf',
   FONTSPRING_API_URL: 'https://example.invalid/fs',
   REMOVE_BG_API_URL: 'https://example.invalid/rb',
+  GEMINI_MODEL: 'gemini-2.5-flash',
+  GEMINI_TIMEOUT_MS: 1000,
 };
 
 let app: Awaited<ReturnType<typeof buildServer>>;
@@ -150,5 +152,50 @@ describe('Project CRUD', () => {
   it('rejects invalid project id', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/projects/..%2Fetc' });
     expect([400, 404]).toContain(r.statusCode);
+  });
+});
+
+describe('POST /api/ai-edit/analyze', () => {
+  it('returns disabled-safe response when Gemini is not configured', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/ai-edit/analyze',
+      payload: { imageBase64: 'A'.repeat(120), mimeType: 'image/png' },
+    });
+    expect(r.statusCode).toBe(503);
+    expect(r.json()).toMatchObject({ error: 'integration_disabled', integration: 'gemini' });
+  });
+
+  it('validates image request before provider dispatch', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/ai-edit/analyze',
+      payload: { imageBase64: 'short', mimeType: 'image/gif' },
+    });
+    expect(r.statusCode).toBe(400);
+  });
+});
+
+describe('POST /api/ai-edit/plan', () => {
+  it('returns disabled-safe response when Gemini is not configured', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/ai-edit/plan',
+      payload: {
+        instruction: 'Remove the red car',
+        analysis: {
+          imageWidth: 100,
+          imageHeight: 100,
+          summary: 'A street with a car',
+          regions: [],
+          warnings: [],
+          provider: 'test',
+          analyzedAt: new Date().toISOString(),
+        },
+        preserveIdentity: true,
+      },
+    });
+    expect(r.statusCode).toBe(503);
+    expect(r.json()).toMatchObject({ error: 'integration_disabled', integration: 'gemini' });
   });
 });
