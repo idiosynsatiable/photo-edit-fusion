@@ -11,14 +11,12 @@ interface Props {
 export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX.Element {
   const fileRef = useRef<HTMLInputElement>(null);
   const projectRef = useRef<HTMLInputElement>(null);
-  const { addImage, applyDoc, doc, undo, redo, history } = useEditorStore((s) => ({
-    addImage: s.addImage,
-    applyDoc: s.applyDoc,
-    doc: s.doc,
-    undo: s.undo,
-    redo: s.redo,
-    history: s.history,
-  }));
+  const addImage = useEditorStore((s) => s.addImage);
+  const applyDoc = useEditorStore((s) => s.applyDoc);
+  const doc = useEditorStore((s) => s.doc);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
+  const history = useEditorStore((s) => s.history);
 
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = e.target.files?.[0];
