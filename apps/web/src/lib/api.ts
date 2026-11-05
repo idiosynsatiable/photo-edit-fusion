@@ -97,12 +97,13 @@ export async function postAiExecute(
   mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
   instruction: string,
   plan: EditPlan,
+  analysis: SceneAnalysis,
   signal?: AbortSignal,
 ): Promise<AiExecuteResult | ApiError> {
   const r = await fetch(`${baseUrl}/api/ai-edit/execute`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ imageBase64, mimeType, instruction, plan, approved: true }),
+    body: JSON.stringify({ imageBase64, mimeType, instruction, plan, analysis, approved: true }),
     signal,
   });
   return (await r.json()) as AiExecuteResult | ApiError;
