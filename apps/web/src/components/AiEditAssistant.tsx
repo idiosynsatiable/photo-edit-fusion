@@ -181,12 +181,24 @@ export function AiEditAssistant(): React.JSX.Element {
       });
       const latest = useEditorStore.getState().doc;
       const layerId = [...latest.layerOrder].reverse().find((id) => latest.layers[id]?.type === 'image' && latest.layers[id]?.name === 'AI Edited Result');
-      if (layerId && maskDataUrl) {
-        const maskBitmapId = 'mask_' + crypto.randomUUID();
-        commit('Attach AI edit mask', (document) => {
-          document.bitmaps[maskBitmapId] = maskDataUrl;
+      if (layerId) {
+        const maskBitmapId = maskDataUrl ? 'mask_' + crypto.randomUUID() : null;
+        commit('Prepare AI edit layer', (document) => {
           const layer = document.layers[layerId];
-          if (layer?.type === 'image') layer.maskBitmapId = maskBitmapId;
+          const source = originalLayerId ? document.layers[originalLayerId] : null;
+          if (layer?.type === 'image' && source?.type === 'image') {
+            layer.transform = {
+              ...source.transform,
+              scale: {
+                x: source.transform.scale.x * source.sourceWidth / layer.sourceWidth,
+                y: source.transform.scale.y * source.sourceHeight / layer.sourceHeight,
+              },
+            };
+          }
+          if (maskBitmapId && maskDataUrl && layer?.type === 'image') {
+            document.bitmaps[maskBitmapId] = maskDataUrl;
+            layer.maskBitmapId = maskBitmapId;
+          }
         });
       }
       if (layerId) setGeneratedLayerIds((current) => [...current, layerId]);
