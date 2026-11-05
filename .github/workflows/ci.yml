@@ -56,6 +56,7 @@ jobs:
         run: pnpm test:e2e
         env:
           CI: 'true'
+          DEBUG: 'pw:webserver'
 
       - name: Upload Playwright diagnostics
         if: failure()
