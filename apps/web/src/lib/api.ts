@@ -1,6 +1,6 @@
 import type { ApiError, FontMatchResult } from '@pef/shared';
 
-const baseUrl = (import.meta.env?.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:4317';
+const configuredBaseUrl = import.meta.env?.VITE_API_BASE_URL as string | undefined;\nconst baseUrl = configuredBaseUrl?.trim() || (import.meta.env?.DEV ? 'http://localhost:4317' : 'https://server-production-b79d.up.railway.app');
 
 export interface IntegrationStatus {
   name: string;
