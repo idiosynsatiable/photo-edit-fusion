@@ -1,4 +1,4 @@
-import { applyPatches, produceWithPatches, type Patch } from 'immer';
+import { applyPatches, enablePatches, produceWithPatches, type Patch } from 'immer';\n\nenablePatches();
 import type { Document } from '@pef/shared';
 
 interface HistoryEntry {
