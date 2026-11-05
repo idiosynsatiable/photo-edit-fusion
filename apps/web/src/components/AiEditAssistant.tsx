@@ -16,6 +16,9 @@ function fileAsDataUrl(file: File): Promise<string> {
 function createRegionMaskDataUrl(width: number, height: number, plan: EditPlan, analysis: SceneAnalysis): string | null {
   const targetIds = new Set(plan.operations.flatMap((operation) => operation.targetRegionIds));
   const targets = analysis.regions.filter((region) => targetIds.has(region.id));
+  if (targetIds.size > 0 && targets.length !== targetIds.size) {
+    throw new Error('The edit plan referenced a scene region that is no longer available. Re-scan the image and regenerate the plan.');
+  }
   if (!targets.length) return null;
 
   const mask = document.createElement('canvas');
