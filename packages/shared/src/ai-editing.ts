@@ -93,6 +93,7 @@ export const AiExecuteRequestSchema = z.object({
   mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
   instruction: z.string().min(1).max(4000),
   plan: EditPlanSchema,
+  analysis: SceneAnalysisSchema,
   approved: z.literal(true),
 });
 export type AiExecuteRequest = z.infer<typeof AiExecuteRequestSchema>;
