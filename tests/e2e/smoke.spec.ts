@@ -46,6 +46,7 @@ test('AI Studio requires explicit Gemini consent before sending an image', async
     body: JSON.stringify({ integrations: [{ name: 'gemini-ai-edit', enabled: true }] }),
   }));
   await page.goto('/');
+  await page.getByRole('button', { name: 'Open AI Studio Ω' }).click();
   const panel = page.locator('section[aria-label="AI editing assistant"]');
   await expect(panel.getByText('Photo Edit Fusion Ω · AI Studio')).toBeVisible();
   await panel.locator('input[type="file"]').setInputFiles({
