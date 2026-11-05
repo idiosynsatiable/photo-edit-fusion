@@ -33,9 +33,7 @@
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "vitest": "^2.1.1",
-    "@capacitor/cli": "^6.2.1"
-  },
-  "dependencies": {
+    "@capacitor/cli": "^6.2.1",
     "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.2.1"
   }
