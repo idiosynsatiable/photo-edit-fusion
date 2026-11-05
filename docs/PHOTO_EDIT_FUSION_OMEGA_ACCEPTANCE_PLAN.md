@@ -1,8 +1,8 @@
 # Photo Edit Fusion Ω — Acceptance & Implementation Plan
 
-**Status:** In progress  
+**Status:** Implementation in progress; full acceptance not yet verified  
 **Acceptance rule:** ALL 16 selected requirements must pass verification.  
-**Branch:** `feat/photo-edit-fusion-omega-autonomous-editor`  
+**Branch:** `main` (implementation merged)  
 **Repository:** `idiosynsatiable/photo-edit-fusion`
 
 This plan extends the existing TypeScript monorepo (PWA + Electron + Fastify API). Preserve the current layer/document model, renderer, masks, undo history, and disabled-safe integrations. Do not ship a parallel demo editor.
@@ -59,3 +59,19 @@ Record: implementation path(s), automated test(s), manual/device test where rele
 - Obtain explicit user consent before sending images to third-party AI providers; disclose provider and retention limitations.
 - Keep original image immutable; operations must be reversible and auditable.
 - Do not claim identity preservation, accuracy, device reliability, or APK readiness without tests.
+
+
+## Current evidence snapshot (2026-11-05)
+
+The checklist above intentionally remains unchecked until every requirement has implementation evidence and the required live/device verification.
+
+- Browser: Playwright smoke tests passed before the latest follow-up commits; latest CI rerun is pending.
+- AI analysis/planning: Gemini-backed routes, structured scene regions, and review-before-approval UI are implemented. Live-key testing remains outstanding.
+- Generative editing: approved image-generation route and separate result layer are implemented. Follow-up edits now use the latest generated result as input. True provider-side inpainting and quality regression fixtures remain outstanding.
+- Identity protection: protected-region metadata, server prompt constraints, and client-side protected-region exclusion from generated-layer masks are implemented. Face/detail regression fixtures remain outstanding; identity preservation is best-effort, never guaranteed.
+- Layers/masks: raster mask attachment and non-destructive mask rendering are implemented. Dedicated mask render/undo/export tests remain outstanding.
+- Comparison/undo: original/latest-result visibility comparison and history-backed layer/mask changes are implemented. Side-by-side comparison and full-session restore tests remain outstanding.
+- Progress/export: stage messages and transparent PNG export path are implemented. Progress/cancellation and alpha/dimension regression tests remain outstanding.
+- Android: debug APK packaging and signature checks passed. The first emulator attempt booted but timed out before install/launch completed. The updated workflow now gives the emulator smoke test 15 minutes and treats failure as a hard gate.
+- Gemini: API key stays server-side and the UI requires explicit consent before sending images/prompts. Railway key configuration and live analysis/edit tests remain outstanding.
+- TITAN: no adapter is claimed. The TITAN repository points to the private Command Center Pro implementation; its documented route is session-authenticated and builder-specific, not a Photo Edit Fusion machine API. A documented service endpoint/auth contract is required before safe adapter implementation.
