@@ -35,8 +35,8 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
       },
       {
         name: 'titan-orchestrator',
-        enabled: !!app.config.TITAN_API_URL && !!app.config.TITAN_API_KEY,
-        reason: app.config.TITAN_API_URL && app.config.TITAN_API_KEY ? undefined : 'TITAN_API_URL and TITAN_API_KEY not set',
+        enabled: false,
+        reason: 'No documented machine-to-machine TITAN endpoint is available for Photo Edit Fusion; configuration is reserved until the authoritative Command Center Pro service contract is exposed.',
       },
     ];
     return { integrations: statuses };
