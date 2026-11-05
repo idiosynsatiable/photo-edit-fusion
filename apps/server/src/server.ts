@@ -22,7 +22,7 @@ export async function buildServer(cfg: Config): Promise<FastifyInstance> {
   });
 
   await app.register(cors, {
-    origin: cfg.PEF_CORS_ORIGIN.split(',').map((s) => s.trim()),
+    origin: [...new Set([...cfg.PEF_CORS_ORIGIN.split(',').map((s) => s.trim()), 'https://localhost', 'capacitor://localhost'])],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
