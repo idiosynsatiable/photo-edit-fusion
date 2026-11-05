@@ -51,6 +51,12 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
     if (projectRef.current) projectRef.current.value = '';
   }
 
+  function createBlankCanvas(): void {
+    const nextDocument = createDocument({ name: 'Untitled', width: 1920, height: 1080 });
+    nextDocument.background = [0, 0, 0, 0];
+    applyDoc(nextDocument);
+  }
+
   function exportProject(): void {
     const json = toProjectFile(doc);
     downloadBlob(new Blob([json], { type: 'application/json' }), `${doc.name}.pef.json`);
@@ -68,6 +74,7 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
     <header className="h-12 border-b border-ink-700 bg-ink-900 flex items-center px-3 gap-2 select-none">
       <div className="font-semibold tracking-wide text-zinc-200">Photo Edit Fusion</div>
       <div className="w-px h-6 bg-ink-700 mx-1" />
+      <button onClick={createBlankCanvas} className="btn">New Canvas</button>
       <button onClick={() => fileRef.current?.click()} className="btn">Open Image</button>
       <button onClick={() => projectRef.current?.click()} className="btn">Open Project</button>
       <button onClick={exportProject} className="btn">Save Project</button>
