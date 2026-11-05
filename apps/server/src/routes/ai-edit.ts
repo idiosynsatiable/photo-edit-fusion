@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   AiAnalyzeRequestSchema,
   AiPlanRequestSchema,
+  AiExecuteRequestSchema,
   SceneAnalysisSchema,
   EditPlanSchema,
   type SceneAnalysis,
@@ -133,4 +134,77 @@ Use only region IDs from the analysis. Preserve faces by default. Set requiresCo
       return reply.status(502).send({ error: 'ai_plan_failed', message: 'Could not prepare an edit plan. Please revise the instruction or retry.' });
     }
   });
+
+  app.post('/api/ai-edit/execute', async (req, reply) => {
+    const parsed = AiExecuteRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'validation_error',
+        details: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+      });
+    }
+    if (!app.config.GEMINI_API_KEY) return disabled(reply);
+
+    const body = parsed.data;
+    const encoded = decodeImageData(body.imageBase64);
+    const bytes = Buffer.from(encoded, 'base64');
+    if (!bytes.length || bytes.length > app.config.PEF_MAX_UPLOAD_BYTES) {
+      return reply.status(413).send({ error: 'image_size_invalid', maxBytes: app.config.PEF_MAX_UPLOAD_BYTES });
+    }
+
+    const operationBrief = body.plan.operations.map((op) =>
+      `- ${op.title}: ${op.description}. Prompt: ${op.prompt ?? op.description}`
+    ).join('\n');
+    const prompt = `Edit the supplied image according to the user's explicitly approved plan.
+User instruction: ${body.instruction}
+Approved operations:
+${operationBrief}
+Identity protection: preserve the original identity, face geometry, facial features, skin texture, expression, and all protected regions. Do not beautify, age, de-age, or alter a person's identity. Keep all unrelated pixels and composition as close to the source as possible. Apply only the requested changes. Return the edited image, not instructions. If an operation is ambiguous, prefer a conservative minimal edit.`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), app.config.GEMINI_TIMEOUT_MS * 2);
+    try {
+      const response = await fetch(
+        `${GEMINI_ENDPOINT}/${encodeURIComponent(app.config.GEMINI_IMAGE_MODEL)}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': app.config.GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [
+              { text: prompt },
+              { inlineData: { mimeType: body.mimeType, data: encoded } },
+            ] }],
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+          }),
+          signal: controller.signal,
+        },
+      );
+      if (!response.ok) throw new Error(`gemini_image_http_${response.status}`);
+      const payload = (await response.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string; inlineData?: { mimeType?: string; data?: string } }> } }>;
+      };
+      const parts = payload.candidates?.[0]?.content?.parts ?? [];
+      const imagePart = parts.find((part) => part.inlineData?.data && part.inlineData.mimeType?.startsWith('image/'));
+      if (!imagePart?.inlineData?.data || !imagePart.inlineData.mimeType) {
+        throw new Error('gemini_image_missing');
+      }
+      const output = Buffer.from(imagePart.inlineData.data, 'base64');
+      if (!output.length || output.length > app.config.PEF_MAX_UPLOAD_BYTES * 2) {
+        return reply.status(502).send({ error: 'ai_output_size_invalid', message: 'Generated image exceeded the allowed output size.' });
+      }
+      return reply.send({
+        imageBase64: imagePart.inlineData.data,
+        mimeType: imagePart.inlineData.mimeType,
+        text: parts.filter((part) => part.text).map((part) => part.text).join(' ').slice(0, 1200),
+        provider: 'gemini-image',
+        completedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      req.log.warn({ code: error instanceof Error ? error.message : 'unknown' }, 'AI image edit execution failed');
+      return reply.status(502).send({ error: 'ai_execution_failed', message: 'The image edit could not be completed. Your original remains unchanged.' });
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+
 }
