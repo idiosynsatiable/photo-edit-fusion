@@ -34,7 +34,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools emulator platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools emulator platforms;android-35 build-tools;35.0.0'
 
       - name: Install workspace dependencies
         run: pnpm install --no-frozen-lockfile
@@ -57,9 +57,11 @@ jobs:
       - name: Smoke test on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 35
+          target: google_apis
           arch: x86_64
           profile: pixel_6
+          disable-animations: true
           script: |
             adb install android/app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -n com.idiosynsatiable.photoeditfusion/.MainActivity
