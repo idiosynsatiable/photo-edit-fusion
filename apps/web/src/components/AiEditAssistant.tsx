@@ -13,6 +13,53 @@ function fileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function createRegionMaskDataUrl(width: number, height: number, plan: EditPlan, analysis: SceneAnalysis): string | null {
+  const targetIds = new Set(plan.operations.flatMap((operation) => operation.targetRegionIds));
+  const targets = analysis.regions.filter((region) => targetIds.has(region.id));
+  if (!targets.length) return null;
+
+  const mask = document.createElement('canvas');
+  mask.width = width;
+  mask.height = height;
+  const context = mask.getContext('2d');
+  if (!context) return null;
+
+  const padX = Math.max(8, Math.round(width * 0.018));
+  const padY = Math.max(8, Math.round(height * 0.018));
+  context.fillStyle = '#fff';
+  for (const region of targets) {
+    const x = Math.max(0, Math.floor(region.bounds.x * width) - padX);
+    const y = Math.max(0, Math.floor(region.bounds.y * height) - padY);
+    const right = Math.min(width, Math.ceil((region.bounds.x + region.bounds.width) * width) + padX);
+    const bottom = Math.min(height, Math.ceil((region.bounds.y + region.bounds.height) * height) + padY);
+    context.fillRect(x, y, Math.max(0, right - x), Math.max(0, bottom - y));
+  }
+
+  const protectedIds = new Set([
+    ...analysis.regions.filter((region) => region.protected).map((region) => region.id),
+    ...plan.identityProtection.protectedRegionIds,
+  ]);
+  context.globalCompositeOperation = 'destination-out';
+  for (const region of analysis.regions.filter((item) => protectedIds.has(item.id))) {
+    const x = Math.max(0, Math.floor(region.bounds.x * width) - padX);
+    const y = Math.max(0, Math.floor(region.bounds.y * height) - padY);
+    const right = Math.min(width, Math.ceil((region.bounds.x + region.bounds.width) * width) + padX);
+    const bottom = Math.min(height, Math.ceil((region.bounds.y + region.bounds.height) * height) + padY);
+    context.fillRect(x, y, Math.max(0, right - x), Math.max(0, bottom - y));
+  }
+  context.globalCompositeOperation = 'source-over';
+
+  const feathered = document.createElement('canvas');
+  feathered.width = width;
+  feathered.height = height;
+  const featherContext = feathered.getContext('2d');
+  if (!featherContext) return mask.toDataURL('image/png');
+  featherContext.filter = `blur(${Math.max(2, Math.round(Math.min(width, height) * 0.006))}px)`;
+  featherContext.drawImage(mask, 0, 0);
+  featherContext.filter = 'none';
+  return feathered.toDataURL('image/png');
+}
+
 export function AiEditAssistant(): React.JSX.Element {
   const [image, setImage] = useState<File | null>(null);
   const [generatedLayerIds, setGeneratedLayerIds] = useState<string[]>([]);
@@ -22,6 +69,7 @@ export function AiEditAssistant(): React.JSX.Element {
   const addImage = useEditorStore((state) => state.addImage);
   const applyDoc = useEditorStore((state) => state.applyDoc);
   const setVisible = useEditorStore((state) => state.setVisible);
+  const commit = useEditorStore((state) => state.commit);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<SceneAnalysis | null>(null);
   const [instruction, setInstruction] = useState('');
@@ -105,7 +153,10 @@ export function AiEditAssistant(): React.JSX.Element {
         outputImage.onerror = () => reject(new Error('Generated image could not be decoded'));
         outputImage.src = outputUrl;
       });
+      setStage('Preparing a reversible region mask…');
+      const maskDataUrl = createRegionMaskDataUrl(outputImage.naturalWidth, outputImage.naturalHeight, plan, analysis);
       setStage('Adding the result as a separate editable layer…');
+      for (const previousId of generatedLayerIds) setVisible(previousId, false);
       const bitmapId = 'ai_' + crypto.randomUUID();
       addImage({
         bitmapId,
@@ -116,10 +167,18 @@ export function AiEditAssistant(): React.JSX.Element {
       });
       const latest = useEditorStore.getState().doc;
       const layerId = [...latest.layerOrder].reverse().find((id) => latest.layers[id]?.type === 'image' && latest.layers[id]?.name === 'AI Edited Result');
+      if (layerId && maskDataUrl) {
+        const maskBitmapId = 'mask_' + crypto.randomUUID();
+        commit('Attach AI edit mask', (document) => {
+          document.bitmaps[maskBitmapId] = maskDataUrl;
+          const layer = document.layers[layerId];
+          if (layer?.type === 'image') layer.maskBitmapId = maskBitmapId;
+        });
+      }
       if (layerId) setGeneratedLayerIds((current) => [...current, layerId]);
       setDataUrl(outputUrl);
       setActiveMimeType(result.mimeType as 'image/png' | 'image/jpeg' | 'image/webp');
-      if (originalLayerId) setVisible(originalLayerId, false);
+      if (originalLayerId) setVisible(originalLayerId, true);
       setShowEdited(true);
       setStage('Edit complete. The latest result is now the active source for follow-up instructions. Earlier results remain in the layer history.');
     } catch (e) {
@@ -130,7 +189,7 @@ export function AiEditAssistant(): React.JSX.Element {
 
   function compare(showEditedResult: boolean) {
     if (!generatedLayerIds.length) return;
-    if (originalLayerId) setVisible(originalLayerId, !showEditedResult);
+    if (originalLayerId) setVisible(originalLayerId, true);
     const latestId = generatedLayerIds[generatedLayerIds.length - 1];
     for (const id of generatedLayerIds) setVisible(id, showEditedResult && id === latestId);
     setShowEdited(showEditedResult);
