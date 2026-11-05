@@ -45,7 +45,7 @@ export function AiEditAssistant(): React.JSX.Element {
         const currentDocument = useEditorStore.getState().doc;
         if (currentDocument.layerOrder.length === 0 && currentDocument.name === 'Untitled') {
           const nextDocument = createDocument({
-            name: image.name.replace(/\\.[^.]+$/, '') || 'Untitled',
+            name: image.name.replace(/\.[^.]+$/, '') || 'Untitled',
             width: sourceImage.naturalWidth,
             height: sourceImage.naturalHeight,
           });
