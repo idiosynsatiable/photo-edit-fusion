@@ -26,17 +26,22 @@ export const SceneAnalysisSchema = z.object({
   analyzedAt: z.string().datetime(),
 });
 
+const EditOperationBase = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  targetRegionIds: z.array(z.string()).default([]),
+  prompt: z.string().optional(),
+  reversible: z.boolean().default(true),
+  requiresConfirmation: z.boolean().default(false),
+});
+
 export const EditOperationSchema = z.discriminatedUnion('type', [
-  z.object({
-    id: z.string().min(1),
-    type: z.enum(['remove-object', 'replace-object', 'adjust', 'add-text', 'recompose']),
-    title: z.string().min(1),
-    description: z.string().min(1),
-    targetRegionIds: z.array(z.string()).default([]),
-    prompt: z.string().optional(),
-    reversible: z.boolean().default(true),
-    requiresConfirmation: z.boolean().default(false),
-  }),
+  EditOperationBase.extend({ type: z.literal('remove-object') }),
+  EditOperationBase.extend({ type: z.literal('replace-object') }),
+  EditOperationBase.extend({ type: z.literal('adjust') }),
+  EditOperationBase.extend({ type: z.literal('add-text') }),
+  EditOperationBase.extend({ type: z.literal('recompose') }),
 ]);
 
 export const EditPlanSchema = z.object({
