@@ -128,6 +128,17 @@ Use only region IDs from the analysis. Preserve faces by default. Set requiresCo
         requiresApproval: true,
         createdAt: new Date().toISOString(),
       }) satisfies EditPlan;
+      const knownRegionIds = new Set(body.analysis.regions.map((region) => region.id));
+      const invalidTarget = plan.operations.find((operation) =>
+        (operation.type === 'remove-object' || operation.type === 'replace-object') &&
+        (operation.targetRegionIds.length === 0 || operation.targetRegionIds.some((id) => !knownRegionIds.has(id)))
+      );
+      if (invalidTarget) {
+        return reply.status(422).send({
+          error: 'edit_target_unresolved',
+          message: 'The edit plan did not resolve a removable/replacable target to a known scene region. Refine the instruction and retry.',
+        });
+      }
       return reply.send({ plan });
     } catch (error) {
       req.log.warn({ code: error instanceof Error ? error.message : 'unknown' }, 'AI edit planning failed');
