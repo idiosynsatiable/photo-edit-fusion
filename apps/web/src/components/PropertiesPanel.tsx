@@ -3,13 +3,11 @@ import { BLEND_MODES, type BlendMode, type Layer } from '@pef/shared';
 import { useEditorStore } from '../store/editor-store.js';
 
 export function PropertiesPanel(): React.JSX.Element {
-  const { doc, selectedLayerId, setBlend, setOpacity, patchLayer } = useEditorStore((s) => ({
-    doc: s.doc,
-    selectedLayerId: s.selectedLayerId,
-    setBlend: s.setBlend,
-    setOpacity: s.setOpacity,
-    patchLayer: s.patchLayer,
-  }));
+  const doc = useEditorStore((s) => s.doc);
+  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
+  const setBlend = useEditorStore((s) => s.setBlend);
+  const setOpacity = useEditorStore((s) => s.setOpacity);
+  const patchLayer = useEditorStore((s) => s.patchLayer);
 
   const layer: Layer | undefined = selectedLayerId ? doc.layers[selectedLayerId] : undefined;
 
