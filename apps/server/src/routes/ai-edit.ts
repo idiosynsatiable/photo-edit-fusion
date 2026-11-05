@@ -22,10 +22,10 @@ async function geminiJson(
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(
-      `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`,
       {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({
           contents: [{ role: 'user', parts }],
           generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
