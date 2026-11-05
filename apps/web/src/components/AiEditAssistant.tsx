@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { EditPlan, SceneAnalysis } from '@pef/shared';
-import { postAiAnalyze, postAiPlan, postAiExecute } from '../lib/api.js';
+import { getIntegrations, postAiAnalyze, postAiPlan, postAiExecute } from '../lib/api.js';
 import { useEditorStore } from '../store/editor-store.js';
 import { createDocument } from '@pef/canvas-engine';
 
@@ -77,8 +77,17 @@ export function AiEditAssistant(): React.JSX.Element {
   const [plan, setPlan] = useState<EditPlan | null>(null);
   const [busy, setBusy] = useState(false);
   const [providerConsent, setProviderConsent] = useState(false);
+  const [geminiEnabled, setGeminiEnabled] = useState<boolean | null>(null);
   const [stage, setStage] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    void getIntegrations().then((items) => {
+      if (active) setGeminiEnabled(items.find((item) => item.name === 'gemini-ai-edit')?.enabled ?? false);
+    }).catch(() => { if (active) setGeminiEnabled(false); });
+    return () => { active = false; };
+  }, []);
 
   async function scan() {
     if (!image) return;
@@ -204,9 +213,10 @@ export function AiEditAssistant(): React.JSX.Element {
           <h2 className="text-sm font-semibold text-zinc-100">Photo Edit Fusion Ω · AI Studio</h2>
           <p className="text-xs text-zinc-400">Scan → describe → review plan</p>
         </div>
-        <span className="rounded-full border border-ink-600 px-2 py-1 text-[10px] text-zinc-400">Gemini</span>
+        <span className="rounded-full border border-ink-600 px-2 py-1 text-[10px] text-zinc-400">{geminiEnabled === null ? 'Checking Gemini…' : geminiEnabled ? 'Gemini connected' : 'Gemini not configured'}</span>
       </div>
 
+      {geminiEnabled === false && <p role="status" className="text-xs text-amber-300">Gemini is not configured on the server. Add GEMINI_API_KEY to the Railway server service variables to enable AI scanning and editing.</p>}
       <label className="block text-xs text-zinc-300">
         Image to analyze
         <input
@@ -235,7 +245,7 @@ export function AiEditAssistant(): React.JSX.Element {
       )}
 
       <label className="flex items-start gap-2 text-[11px] text-zinc-400"><input type="checkbox" checked={providerConsent} onChange={(event) => setProviderConsent(event.target.checked)} className="mt-0.5" /><span>I consent to sending this image and my editing instructions to Google Gemini for AI processing. I understand processing is performed by the provider under its terms.</span></label>
-      <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-40" disabled={!image || !providerConsent || busy} onClick={() => void scan()}>
+      <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-40" disabled={!image || !providerConsent || !geminiEnabled || busy} onClick={() => void scan()}>
         {busy && !analysis ? 'Scanning…' : 'Scan entire image'}
       </button>
 
@@ -262,7 +272,7 @@ export function AiEditAssistant(): React.JSX.Element {
           onChange={(event) => setInstruction(event.target.value)}
         />
       </label>
-      <button className="rounded bg-cyan-800 px-3 py-2 text-xs font-medium text-white disabled:opacity-40" disabled={!analysis || !instruction.trim() || busy} onClick={() => void createPlan()}>
+      <button className="rounded bg-cyan-800 px-3 py-2 text-xs font-medium text-white disabled:opacity-40" disabled={!analysis || !instruction.trim() || !geminiEnabled || busy} onClick={() => void createPlan()}>
         {busy && analysis ? 'Planning…' : 'Generate edit plan'}
       </button>
 
@@ -283,7 +293,7 @@ export function AiEditAssistant(): React.JSX.Element {
               </li>
             ))}
           </ol>
-          <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" disabled={busy || !dataUrl || !image || !providerConsent} onClick={() => void executePlan()}>Approve & apply edits</button>
+          <button className="rounded bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40" disabled={busy || !dataUrl || !image || !providerConsent || !geminiEnabled} onClick={() => void executePlan()}>Approve & apply edits</button>
           <p className="text-[10px] text-zinc-400">Applying creates a separate result layer. The original image is retained for comparison and undo.</p>
         </div>
       )}
