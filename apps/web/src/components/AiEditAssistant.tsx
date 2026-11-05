@@ -47,7 +47,7 @@ export function AiEditAssistant(): React.JSX.Element {
         if (sourceId) setOriginalLayerId(sourceId);
       }
       const result = await postAiAnalyze(url, image.type as 'image/png' | 'image/jpeg' | 'image/webp');
-      if ('error' in result) throw new Error(result.message ?? result.error);
+      if ('error' in result) throw new Error(result.error);
       setAnalysis(result.analysis);
       setStage(`Scan complete: ${result.analysis.regions.length} regions identified`);
     } catch (e) {
