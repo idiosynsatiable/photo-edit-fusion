@@ -15,6 +15,7 @@ function fileAsDataUrl(file: File): Promise<string> {
 export function AiEditAssistant(): React.JSX.Element {
   const [image, setImage] = useState<File | null>(null);
   const [generatedLayerId, setGeneratedLayerId] = useState<string | null>(null);
+  const [originalLayerId, setOriginalLayerId] = useState<string | null>(null);
   const [showEdited, setShowEdited] = useState(true);
   const addImage = useEditorStore((state) => state.addImage);
   const setVisible = useEditorStore((state) => state.setVisible);
@@ -32,6 +33,19 @@ export function AiEditAssistant(): React.JSX.Element {
     try {
       const url = await fileAsDataUrl(image);
       setDataUrl(url);
+      if (!originalLayerId) {
+        const sourceImage = new Image();
+        await new Promise<void>((resolve, reject) => {
+          sourceImage.onload = () => resolve();
+          sourceImage.onerror = () => reject(new Error('Source image could not be decoded'));
+          sourceImage.src = url;
+        });
+        const sourceBitmapId = 'source_' + crypto.randomUUID();
+        addImage({ bitmapId: sourceBitmapId, bitmapDataUrl: url, sourceWidth: sourceImage.naturalWidth, sourceHeight: sourceImage.naturalHeight, name: image.name });
+        const latest = useEditorStore.getState().doc;
+        const sourceId = [...latest.layerOrder].reverse().find((id) => latest.layers[id]?.type === 'image' && latest.layers[id]?.name === image.name);
+        if (sourceId) setOriginalLayerId(sourceId);
+      }
       const result = await postAiAnalyze(url, image.type as 'image/png' | 'image/jpeg' | 'image/webp');
       if ('error' in result) throw new Error(result.message ?? result.error);
       setAnalysis(result.analysis);
@@ -118,7 +132,7 @@ export function AiEditAssistant(): React.JSX.Element {
           accept="image/png,image/jpeg,image/webp"
           onChange={(event) => {
             const next = event.target.files?.[0] ?? null;
-            setImage(next); setAnalysis(null); setPlan(null); setDataUrl(null); setError(''); setStage('');
+            setImage(next); setAnalysis(null); setPlan(null); setDataUrl(null); setGeneratedLayerId(null); setOriginalLayerId(null); setError(''); setStage('');
           }}
         />
       </label>
