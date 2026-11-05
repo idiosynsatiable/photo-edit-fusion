@@ -2,16 +2,14 @@ import React from 'react';
 import { useEditorStore } from '../store/editor-store.js';
 
 export function LayersPanel(): React.JSX.Element {
-  const { doc, selectedLayerId, selectLayer, setVisible, setLocked, removeLayer, duplicate, reorder } = useEditorStore((s) => ({
-    doc: s.doc,
-    selectedLayerId: s.selectedLayerId,
-    selectLayer: s.selectLayer,
-    setVisible: s.setVisible,
-    setLocked: s.setLocked,
-    removeLayer: s.removeLayer,
-    duplicate: s.duplicate,
-    reorder: s.reorder,
-  }));
+  const doc = useEditorStore((s) => s.doc);
+  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
+  const selectLayer = useEditorStore((s) => s.selectLayer);
+  const setVisible = useEditorStore((s) => s.setVisible);
+  const setLocked = useEditorStore((s) => s.setLocked);
+  const removeLayer = useEditorStore((s) => s.removeLayer);
+  const duplicate = useEditorStore((s) => s.duplicate);
+  const reorder = useEditorStore((s) => s.reorder);
 
   // top-down rendering = reverse of layerOrder so top layers appear first in the panel
   const orderedTopDown = [...doc.layerOrder].reverse();

@@ -3,7 +3,8 @@ import { useEditorStore } from '../store/editor-store.js';
 import { getIntegrations, type IntegrationStatus } from '../lib/api.js';
 
 export function StatusBar(): React.JSX.Element {
-  const { doc, zoom } = useEditorStore((s) => ({ doc: s.doc, zoom: s.zoom }));
+  const doc = useEditorStore((s) => s.doc);
+  const zoom = useEditorStore((s) => s.zoom);
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
 
   useEffect(() => {

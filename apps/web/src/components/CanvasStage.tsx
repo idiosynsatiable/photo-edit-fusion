@@ -13,16 +13,14 @@ export function CanvasStage(): React.JSX.Element {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const bitmapsRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  const { doc, zoom, setZoom, activeTool, selectedLayerId, selectLayer, patchLayer, commit } = useEditorStore((s) => ({
-    doc: s.doc,
-    zoom: s.zoom,
-    setZoom: s.setZoom,
-    activeTool: s.activeTool,
-    selectedLayerId: s.selectedLayerId,
-    selectLayer: s.selectLayer,
-    patchLayer: s.patchLayer,
-    commit: s.commit,
-  }));
+  const doc = useEditorStore((s) => s.doc);
+  const zoom = useEditorStore((s) => s.zoom);
+  const setZoom = useEditorStore((s) => s.setZoom);
+  const activeTool = useEditorStore((s) => s.activeTool);
+  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
+  const selectLayer = useEditorStore((s) => s.selectLayer);
+  const patchLayer = useEditorStore((s) => s.patchLayer);
+  const commit = useEditorStore((s) => s.commit);
 
   const [lassoPoints, setLassoPoints] = useState<Vec2[]>([]);
   const [drawing, setDrawing] = useState(false);

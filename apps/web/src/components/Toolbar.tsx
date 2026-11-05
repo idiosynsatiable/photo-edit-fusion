@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useEditorStore } from '../store/editor-store.js';
-import { fromProjectFile, toProjectFile } from '@pef/canvas-engine';
+import { createDocument, fromProjectFile, toProjectFile } from '@pef/canvas-engine';
 import { downloadBlob, loadImage, readFileAsDataUrl } from '../lib/file-utils.js';
 
 interface Props {
@@ -11,20 +11,25 @@ interface Props {
 export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX.Element {
   const fileRef = useRef<HTMLInputElement>(null);
   const projectRef = useRef<HTMLInputElement>(null);
-  const { addImage, applyDoc, doc, undo, redo, history } = useEditorStore((s) => ({
-    addImage: s.addImage,
-    applyDoc: s.applyDoc,
-    doc: s.doc,
-    undo: s.undo,
-    redo: s.redo,
-    history: s.history,
-  }));
+  const addImage = useEditorStore((s) => s.addImage);
+  const applyDoc = useEditorStore((s) => s.applyDoc);
+  const doc = useEditorStore((s) => s.doc);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
+  const history = useEditorStore((s) => s.history);
 
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = e.target.files?.[0];
     if (!file) return;
     const dataUrl = await readFileAsDataUrl(file);
     const img = await loadImage(dataUrl);
+    const nextDocument = createDocument({
+      name: file.name.replace(/\.[^.]+$/, '') || 'Untitled',
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+    });
+    nextDocument.background = [0, 0, 0, 0];
+    applyDoc(nextDocument);
     addImage({
       bitmapId: `b_${Date.now()}`,
       bitmapDataUrl: dataUrl,
@@ -44,6 +49,12 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
     if (projectRef.current) projectRef.current.value = '';
   }
 
+  function createBlankCanvas(): void {
+    const nextDocument = createDocument({ name: 'Untitled', width: 1920, height: 1080 });
+    nextDocument.background = [0, 0, 0, 0];
+    applyDoc(nextDocument);
+  }
+
   function exportProject(): void {
     const json = toProjectFile(doc);
     downloadBlob(new Blob([json], { type: 'application/json' }), `${doc.name}.pef.json`);
@@ -61,6 +72,7 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
     <header className="h-12 border-b border-ink-700 bg-ink-900 flex items-center px-3 gap-2 select-none">
       <div className="font-semibold tracking-wide text-zinc-200">Photo Edit Fusion</div>
       <div className="w-px h-6 bg-ink-700 mx-1" />
+      <button onClick={createBlankCanvas} className="btn">New Canvas</button>
       <button onClick={() => fileRef.current?.click()} className="btn">Open Image</button>
       <button onClick={() => projectRef.current?.click()} className="btn">Open Project</button>
       <button onClick={exportProject} className="btn">Save Project</button>

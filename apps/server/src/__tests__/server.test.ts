@@ -19,6 +19,9 @@ const cfg: Config = {
   WHATTHEFONT_API_URL: 'https://example.invalid/wtf',
   FONTSPRING_API_URL: 'https://example.invalid/fs',
   REMOVE_BG_API_URL: 'https://example.invalid/rb',
+  GEMINI_MODEL: 'gemini-2.5-flash',
+  GEMINI_IMAGE_MODEL: 'gemini-2.5-flash-image',
+  GEMINI_TIMEOUT_MS: 1000,
 };
 
 let app: Awaited<ReturnType<typeof buildServer>>;
@@ -45,7 +48,7 @@ describe('GET /api/health', () => {
 });
 
 describe('GET /api/integrations', () => {
-  it('returns five integration entries with disabled-safe info', async () => {
+  it('returns integration entries with disabled-safe info', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/integrations' });
     expect(r.statusCode).toBe(200);
     const body = r.json() as { integrations: Array<{ name: string; enabled: boolean }> };
@@ -150,5 +153,94 @@ describe('Project CRUD', () => {
   it('rejects invalid project id', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/projects/..%2Fetc' });
     expect([400, 404]).toContain(r.statusCode);
+  });
+});
+
+describe('POST /api/ai-edit/analyze', () => {
+  it('returns disabled-safe response when Gemini is not configured', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/ai-edit/analyze',
+      payload: { imageBase64: 'A'.repeat(120), mimeType: 'image/png' },
+    });
+    expect(r.statusCode).toBe(503);
+    expect(r.json()).toMatchObject({ error: 'integration_disabled', integration: 'gemini' });
+  });
+
+  it('validates image request before provider dispatch', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/ai-edit/analyze',
+      payload: { imageBase64: 'short', mimeType: 'image/gif' },
+    });
+    expect(r.statusCode).toBe(400);
+  });
+});
+
+describe('POST /api/ai-edit/plan', () => {
+  it('returns disabled-safe response when Gemini is not configured', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/ai-edit/plan',
+      payload: {
+        instruction: 'Remove the red car',
+        analysis: {
+          imageWidth: 100,
+          imageHeight: 100,
+          summary: 'A street with a car',
+          regions: [],
+          warnings: [],
+          provider: 'test',
+          analyzedAt: new Date().toISOString(),
+        },
+        preserveIdentity: true,
+      },
+    });
+    expect(r.statusCode).toBe(503);
+    expect(r.json()).toMatchObject({ error: 'integration_disabled', integration: 'gemini' });
+  });
+});
+
+
+describe('POST /api/ai-edit/execute', () => {
+  it('requires an explicitly approved plan and validates the image contract', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/ai-edit/execute',
+      payload: { imageBase64: 'short', mimeType: 'image/gif', approved: false },
+    });
+    expect(r.statusCode).toBe(400);
+  });
+
+  it('returns disabled-safe response when Gemini is not configured', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/ai-edit/execute',
+      payload: {
+        imageBase64: 'A'.repeat(120),
+        mimeType: 'image/png',
+        instruction: 'Remove the sign from the background',
+        approved: true,
+        plan: {
+          id: 'plan-1',
+          userInstruction: 'Remove the sign from the background',
+          rationale: 'The sign is a separate object.',
+          operations: [{
+            id: 'op-1',
+            type: 'remove-object',
+            title: 'Remove sign',
+            description: 'Remove the sign and reconstruct the background.',
+            targetRegionIds: ['sign-1'],
+            reversible: true,
+            requiresConfirmation: true,
+          }],
+          identityProtection: { preserveFaces: true, protectedRegionIds: [] },
+          requiresApproval: true,
+          createdAt: new Date().toISOString(),
+        },
+      },
+    });
+    expect(r.statusCode).toBe(503);
+    expect(r.json()).toMatchObject({ error: 'integration_disabled', integration: 'gemini' });
   });
 });

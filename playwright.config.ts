@@ -3,14 +3,17 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
-  retries: process.env.CI ? 2 : 0,
+  retries: 0,
   use: {
-    baseURL: 'http://localhost:5173',
-    trace: 'on-first-retry',
+    baseURL: 'http://127.0.0.1:5173',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm --filter @pef/web dev',
-    url: 'http://localhost:5173',
+    command: 'pnpm exec vite --host 127.0.0.1',
+    cwd: 'apps/web',
+    url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

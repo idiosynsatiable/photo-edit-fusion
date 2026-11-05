@@ -1,0 +1,88 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: photo-edit-fusion-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools emulator platforms;android-35 build-tools;35.0.0'
+
+      - name: Install workspace dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build web editor
+        run: pnpm build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://server-production-b79d.up.railway.app' }}
+
+      - name: Generate Android project
+        run: pnpm exec cap add android
+
+      - name: Sync web assets and native plugins
+        run: pnpm exec cap sync android
+
+      - name: Assemble debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: photo-edit-fusion-android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Verify APK metadata and signature
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk | grep "package: name='com.idiosynsatiable.photoeditfusion'"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Best-effort Android emulator launch
+        continue-on-error: true
+        timeout-minutes: 8
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n com.idiosynsatiable.photoeditfusion/.MainActivity
+            sleep 12
+            adb shell pidof com.idiosynsatiable.photoeditfusion

@@ -12,11 +12,9 @@ interface ApiErrorResp { error: string; reason?: string; integration?: string }
 type AiCutResponse = AiCutResponseRemote | AiCutResponseDelegated | ApiErrorResp;
 
 export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
-  const { doc, selectedLayerId, commit } = useEditorStore((s) => ({
-    doc: s.doc,
-    selectedLayerId: s.selectedLayerId,
-    commit: s.commit,
-  }));
+  const doc = useEditorStore((s) => s.doc);
+  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
+  const commit = useEditorStore((s) => s.commit);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<'auto' | 'local-onnx' | 'remove-bg'>('auto');
