@@ -27,6 +27,8 @@ export function App(): React.JSX.Element {
     let db: IDBDatabase | null = null;
     let saveTimer: ReturnType<typeof setTimeout> | undefined;
     let unsubscribe: (() => void) | undefined;
+    let persistNow: (() => void) | undefined;
+    let visibilityHandler: (() => void) | undefined;
     const request = window.indexedDB.open('photo-edit-fusion-local', 1);
 
     request.onupgradeneeded = () => {
@@ -39,7 +41,24 @@ export function App(): React.JSX.Element {
       const read = db.transaction('documents', 'readonly').objectStore('documents').get('autosave');
       read.onsuccess = () => {
         if (disposed) return;
-        if (read.result) useEditorStore.getState().applyDoc(read.result);
+        const current = useEditorStore.getState().doc;
+        if (read.result && current.layerOrder.length === 0 && current.name === 'Untitled') {
+          useEditorStore.getState().applyDoc(read.result);
+        }
+        persistNow = () => {
+          if (!db || disposed) return;
+          if (saveTimer) clearTimeout(saveTimer);
+          try {
+            db.transaction('documents', 'readwrite').objectStore('documents').put(useEditorStore.getState().doc, 'autosave');
+          } catch {
+            // Manual Save Project export remains available if device storage is full.
+          }
+        };
+        visibilityHandler = () => {
+          if (document.visibilityState === 'hidden') persistNow?.();
+        };
+        window.addEventListener('pagehide', persistNow);
+        document.addEventListener('visibilitychange', visibilityHandler);
         unsubscribe = useEditorStore.subscribe((state, previous) => {
           if (state.doc === previous.doc || !db) return;
           if (saveTimer) clearTimeout(saveTimer);
@@ -60,6 +79,8 @@ export function App(): React.JSX.Element {
       disposed = true;
       if (saveTimer) clearTimeout(saveTimer);
       unsubscribe?.();
+      if (persistNow) window.removeEventListener('pagehide', persistNow);
+      if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
       db?.close();
     };
   }, []);
