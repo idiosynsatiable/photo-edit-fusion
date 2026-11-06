@@ -103,6 +103,7 @@ export function CanvasStage(): React.JSX.Element {
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const p = eventToDoc(e);
     if (activeTool === 'move') {
       const hit = hitTest(doc, p);
@@ -142,7 +143,7 @@ export function CanvasStage(): React.JSX.Element {
       }
     }
     setDragOffset(null);
-    void e;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   }
 
   function applyLassoCut(): void {
@@ -239,17 +240,19 @@ export function CanvasStage(): React.JSX.Element {
   }
 
   return (
-    <div ref={stageRef} className="flex-1 overflow-auto bg-[#0e0e12] p-8 flex items-center justify-center" onWheel={onWheel}>
+    <div ref={stageRef} className="min-w-0 min-h-0 flex-1 overflow-auto bg-[#0e0e12] p-8 max-sm:p-2 flex items-center justify-center" onWheel={onWheel}>
       <div
         className="relative shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
         style={{
           width: doc.width * zoom,
           height: doc.height * zoom,
           transformOrigin: 'top left',
+          touchAction: 'none',
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
       >
         <canvas
           ref={canvasRef}
