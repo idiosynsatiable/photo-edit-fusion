@@ -25,12 +25,12 @@ export function App(): React.JSX.Element {
   }, [tool]);
 
   return (
-    <div className="h-screen flex flex-col bg-ink-950 text-zinc-100">
+    <div className="h-screen min-h-0 flex flex-col overflow-hidden bg-ink-950 text-zinc-100">
       <Toolbar onOpenFontModal={() => setFontModalOpen(true)} onOpenAiCutModal={() => setAiCutModalOpen(true)} />
-      <div className="flex-1 flex overflow-hidden">
+      <div className="min-h-0 flex-1 flex overflow-hidden">
         <ToolsRail />
         <CanvasStage />
-        <div className="w-72 border-l border-ink-700 flex flex-col">
+        <div className="w-72 max-sm:w-40 shrink-0 border-l border-ink-700 flex flex-col">
           <LayersPanel />
           <PropertiesPanel />
         </div>
