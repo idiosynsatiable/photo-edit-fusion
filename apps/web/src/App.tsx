@@ -19,6 +19,51 @@ export function App(): React.JSX.Element {
 
   useKeyboardShortcuts();
 
+  // Keep the working document on-device. This uses IndexedDB, not Railway,
+  // so a closed tab or interrupted session does not erase the current project.
+  useEffect(() => {
+    if (!('indexedDB' in window)) return;
+    let disposed = false;
+    let db: IDBDatabase | null = null;
+    let saveTimer: ReturnType<typeof setTimeout> | undefined;
+    let unsubscribe: (() => void) | undefined;
+    const request = window.indexedDB.open('photo-edit-fusion-local', 1);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains('documents')) database.createObjectStore('documents');
+    };
+
+    request.onsuccess = () => {
+      db = request.result;
+      const read = db.transaction('documents', 'readonly').objectStore('documents').get('autosave');
+      read.onsuccess = () => {
+        if (disposed) return;
+        if (read.result) useEditorStore.getState().applyDoc(read.result);
+        unsubscribe = useEditorStore.subscribe((state, previous) => {
+          if (state.doc === previous.doc || !db) return;
+          if (saveTimer) clearTimeout(saveTimer);
+          const nextDocument = state.doc;
+          saveTimer = setTimeout(() => {
+            if (!db || disposed) return;
+            try {
+              db.transaction('documents', 'readwrite').objectStore('documents').put(nextDocument, 'autosave');
+            } catch {
+              // Manual Save Project export remains available if device storage is full.
+            }
+          }, 500);
+        });
+      };
+    };
+
+    return () => {
+      disposed = true;
+      if (saveTimer) clearTimeout(saveTimer);
+      unsubscribe?.();
+      db?.close();
+    };
+  }, []);
+
   useEffect(() => {
     if (tool === 'font-extract') setFontModalOpen(true);
     if (tool === 'ai-cut') setAiCutModalOpen(true);
