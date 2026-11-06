@@ -43,10 +43,11 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build web editor
+      - name: Build web editor (offline-first)
         run: pnpm build
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://server-production-b79d.up.railway.app' }}
+          # Blank by design: an Android APK must not depend on Railway being paid or online.
+          VITE_API_BASE_URL: ''
 
       - name: Generate Android project
         run: pnpm exec cap add android
@@ -72,7 +73,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Android emulator install and launch smoke test
-        timeout-minutes: 15
+        timeout-minutes: 25
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -80,7 +81,10 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
+            adb wait-for-device
+            adb shell am wait-for-broadcast-idle
             adb install android/app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -n com.idiosynsatiable.photoeditfusion/.MainActivity
             sleep 12
