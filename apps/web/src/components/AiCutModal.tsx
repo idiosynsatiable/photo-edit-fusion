@@ -137,6 +137,7 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
           <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
         </header>
         {!canRun && <div className="text-sm text-zinc-400 mb-3">Select an image layer to remove its background.</div>}
+        <p className="mb-3 text-xs text-amber-200/80">Offline Local mode uses a lightweight corner-color background remover, not semantic AI segmentation. It works without a server, but busy or multicolored backgrounds may need manual Lasso or Magic Wand cleanup.</p>
         <div className="flex items-center gap-3 mb-3 text-sm">
           <label className="flex items-center gap-2">
             <input type="radio" checked={provider === 'auto'} onChange={() => setProvider('auto')} /> Auto
