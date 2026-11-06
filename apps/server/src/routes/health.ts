@@ -27,7 +27,7 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
         reason: app.config.REMOVE_BG_API_KEY ? undefined : 'REMOVE_BG_API_KEY not set',
       },
       { name: 'google-fonts-similarity', enabled: true },
-      { name: 'local-onnx-cut', enabled: true },
+      { name: 'local-basic-cut', enabled: true, reason: 'Lightweight corner-color removal; no semantic ONNX model is bundled.' },
       {
         name: 'gemini-ai-edit',
         enabled: !!app.config.GEMINI_API_KEY,
