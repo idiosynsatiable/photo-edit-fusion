@@ -21,7 +21,7 @@ Reports which optional integrations are configured.
     { "name": "fontspring",  "enabled": false, "reason": "FONTSPRING_API_KEY not set" },
     { "name": "remove-bg",   "enabled": false, "reason": "REMOVE_BG_API_KEY not set" },
     { "name": "google-fonts-similarity", "enabled": true },
-    { "name": "local-onnx-cut", "enabled": true }
+    { "name": "local-basic-cut", "enabled": true, "reason": "Lightweight corner-color removal; no semantic ONNX model is bundled." }
   ]
 }
 ```

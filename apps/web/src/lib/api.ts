@@ -1,7 +1,16 @@
 import type { ApiError, FontMatchResult } from '@pef/shared';
 
 const configuredBaseUrl = import.meta.env?.VITE_API_BASE_URL as string | undefined;
-const baseUrl = configuredBaseUrl?.trim() || (import.meta.env?.DEV ? 'http://localhost:4317' : 'https://server-production-b79d.up.railway.app');
+// A production client must never silently call a paid or user-owned cloud host.
+// Cloud APIs are opt-in through VITE_API_BASE_URL; core editing stays local.
+const baseUrl = configuredBaseUrl?.trim() || (import.meta.env?.DEV ? 'http://localhost:4317' : '');
+
+function apiUrl(path: string): string {
+  if (!baseUrl) {
+    throw new Error('Cloud services are not configured. Local editing remains available; connect an API server to use this feature.');
+  }
+  return `${baseUrl}${path}`;
+}
 
 export interface IntegrationStatus {
   name: string;
@@ -10,14 +19,19 @@ export interface IntegrationStatus {
 }
 
 export async function getIntegrations(): Promise<IntegrationStatus[]> {
-  const r = await fetch(`${baseUrl}/api/integrations`);
-  if (!r.ok) return [];
-  const json = (await r.json()) as { integrations: IntegrationStatus[] };
-  return json.integrations;
+  if (!baseUrl) return [];
+  try {
+    const r = await fetch(apiUrl('/api/integrations'));
+    if (!r.ok) return [];
+    const json = (await r.json()) as { integrations: IntegrationStatus[] };
+    return json.integrations;
+  } catch {
+    return [];
+  }
 }
 
 export async function postFontIdentify(imageBase64: string, signal?: AbortSignal): Promise<FontMatchResult | ApiError> {
-  const r = await fetch(`${baseUrl}/api/font-id`, {
+  const r = await fetch(apiUrl('/api/font-id'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ imageBase64 }),
@@ -27,16 +41,25 @@ export async function postFontIdentify(imageBase64: string, signal?: AbortSignal
 }
 
 export async function postAiCut(imageBase64: string, preferProvider?: 'local-onnx' | 'remove-bg'): Promise<unknown> {
-  const r = await fetch(`${baseUrl}/api/ai-cut`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ imageBase64, preferProvider }),
-  });
-  return await r.json();
+  // The local cut path is intentionally available without any backend or API key.
+  if (!baseUrl || preferProvider === 'local-onnx') {
+    return { provider: 'local-onnx', delegateToClient: true };
+  }
+  try {
+    const r = await fetch(apiUrl('/api/ai-cut'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ imageBase64, preferProvider }),
+    });
+    return await r.json();
+  } catch {
+    // A sleeping, missing, or unreachable server must not block local editing.
+    return { provider: 'local-onnx', delegateToClient: true };
+  }
 }
 
 export async function saveProject(id: string, project: { formatVersion: 1; document: unknown }): Promise<{ id: string; ok: true } | ApiError> {
-  const r = await fetch(`${baseUrl}/api/projects`, {
+  const r = await fetch(apiUrl('/api/projects'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ id, project }),
@@ -45,10 +68,15 @@ export async function saveProject(id: string, project: { formatVersion: 1; docum
 }
 
 export async function listProjects(): Promise<Array<{ id: string; modifiedAt: string; bytes: number }>> {
-  const r = await fetch(`${baseUrl}/api/projects`);
-  if (!r.ok) return [];
-  const json = (await r.json()) as { projects: Array<{ id: string; modifiedAt: string; bytes: number }> };
-  return json.projects;
+  if (!baseUrl) return [];
+  try {
+    const r = await fetch(apiUrl('/api/projects'));
+    if (!r.ok) return [];
+    const json = (await r.json()) as { projects: Array<{ id: string; modifiedAt: string; bytes: number }> };
+    return json.projects;
+  } catch {
+    return [];
+  }
 }
 
 import type { EditPlan, SceneAnalysis } from '@pef/shared';
@@ -58,7 +86,7 @@ export async function postAiAnalyze(
   mimeType: 'image/png' | 'image/jpeg' | 'image/webp',
   signal?: AbortSignal,
 ): Promise<{ analysis: SceneAnalysis } | ApiError> {
-  const r = await fetch(`${baseUrl}/api/ai-edit/analyze`, {
+  const r = await fetch(apiUrl('/api/ai-edit/analyze'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ imageBase64, mimeType }),
@@ -74,7 +102,7 @@ export async function postAiPlan(
   priorOperations: EditPlan['operations'] = [],
   signal?: AbortSignal,
 ): Promise<{ plan: EditPlan } | ApiError> {
-  const r = await fetch(`${baseUrl}/api/ai-edit/plan`, {
+  const r = await fetch(apiUrl('/api/ai-edit/plan'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ instruction, analysis, preserveIdentity, priorOperations }),
@@ -82,7 +110,6 @@ export async function postAiPlan(
   });
   return (await r.json()) as { plan: EditPlan } | ApiError;
 }
-
 
 export interface AiExecuteResult {
   imageBase64: string;
@@ -100,7 +127,7 @@ export async function postAiExecute(
   analysis: SceneAnalysis,
   signal?: AbortSignal,
 ): Promise<AiExecuteResult | ApiError> {
-  const r = await fetch(`${baseUrl}/api/ai-edit/execute`, {
+  const r = await fetch(apiUrl('/api/ai-edit/execute'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ imageBase64, mimeType, instruction, plan, analysis, approved: true }),

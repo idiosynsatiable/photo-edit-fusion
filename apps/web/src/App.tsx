@@ -19,18 +19,84 @@ export function App(): React.JSX.Element {
 
   useKeyboardShortcuts();
 
+  // Keep the working document on-device. This uses IndexedDB, not Railway,
+  // so a closed tab or interrupted session does not erase the current project.
+  useEffect(() => {
+    if (!('indexedDB' in window)) return;
+    let disposed = false;
+    let db: IDBDatabase | null = null;
+    let saveTimer: ReturnType<typeof setTimeout> | undefined;
+    let unsubscribe: (() => void) | undefined;
+    let persistNow: (() => void) | undefined;
+    let visibilityHandler: (() => void) | undefined;
+    const request = window.indexedDB.open('photo-edit-fusion-local', 1);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains('documents')) database.createObjectStore('documents');
+    };
+
+    request.onsuccess = () => {
+      db = request.result;
+      const read = db.transaction('documents', 'readonly').objectStore('documents').get('autosave');
+      read.onsuccess = () => {
+        if (disposed) return;
+        const current = useEditorStore.getState().doc;
+        if (read.result && current.layerOrder.length === 0 && current.name === 'Untitled') {
+          useEditorStore.getState().applyDoc(read.result);
+        }
+        persistNow = () => {
+          if (!db || disposed) return;
+          if (saveTimer) clearTimeout(saveTimer);
+          try {
+            db.transaction('documents', 'readwrite').objectStore('documents').put(useEditorStore.getState().doc, 'autosave');
+          } catch {
+            // Manual Save Project export remains available if device storage is full.
+          }
+        };
+        visibilityHandler = () => {
+          if (document.visibilityState === 'hidden') persistNow?.();
+        };
+        window.addEventListener('pagehide', persistNow);
+        document.addEventListener('visibilitychange', visibilityHandler);
+        unsubscribe = useEditorStore.subscribe((state, previous) => {
+          if (state.doc === previous.doc || !db) return;
+          if (saveTimer) clearTimeout(saveTimer);
+          const nextDocument = state.doc;
+          saveTimer = setTimeout(() => {
+            if (!db || disposed) return;
+            try {
+              db.transaction('documents', 'readwrite').objectStore('documents').put(nextDocument, 'autosave');
+            } catch {
+              // Manual Save Project export remains available if device storage is full.
+            }
+          }, 500);
+        });
+      };
+    };
+
+    return () => {
+      disposed = true;
+      if (saveTimer) clearTimeout(saveTimer);
+      unsubscribe?.();
+      if (persistNow) window.removeEventListener('pagehide', persistNow);
+      if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
+      db?.close();
+    };
+  }, []);
+
   useEffect(() => {
     if (tool === 'font-extract') setFontModalOpen(true);
     if (tool === 'ai-cut') setAiCutModalOpen(true);
   }, [tool]);
 
   return (
-    <div className="h-screen flex flex-col bg-ink-950 text-zinc-100">
+    <div className="h-screen min-h-0 flex flex-col overflow-hidden bg-ink-950 text-zinc-100">
       <Toolbar onOpenFontModal={() => setFontModalOpen(true)} onOpenAiCutModal={() => setAiCutModalOpen(true)} />
-      <div className="flex-1 flex overflow-hidden">
+      <div className="min-h-0 flex-1 flex overflow-hidden">
         <ToolsRail />
         <CanvasStage />
-        <div className="w-72 border-l border-ink-700 flex flex-col">
+        <div className="w-72 max-sm:w-40 shrink-0 border-l border-ink-700 flex flex-col">
           <LayersPanel />
           <PropertiesPanel />
         </div>

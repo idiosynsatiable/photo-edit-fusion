@@ -14,7 +14,6 @@ interface CropRect { x: number; y: number; w: number; h: number }
 export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | null {
   const doc = useEditorStore((s) => s.doc);
   const addText = useEditorStore((s) => s.addText);
-  const setFontMatches = useEditorStore((s) => s.setFontMatches);
   const lastFontMatches = useEditorStore((s) => s.lastFontMatches);
   const lastFontMatchProvider = useEditorStore((s) => s.lastFontMatchProvider);
 
@@ -35,23 +34,25 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
     dst.width = src.width * ratio;
     dst.height = src.height * ratio;
     const ctx = dst.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(src, 0, 0, dst.width, dst.height);
-    }
+    if (ctx) ctx.drawImage(src, 0, 0, dst.width, dst.height);
     setCrop(null);
     setError(null);
   }, [open]);
 
-  function onMouseDown(e: React.MouseEvent<HTMLCanvasElement>): void {
+  function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
+    e.currentTarget.setPointerCapture(e.pointerId);
     const r = e.currentTarget.getBoundingClientRect();
     setDrag({ x: e.clientX - r.left, y: e.clientY - r.top, w: 0, h: 0 });
   }
-  function onMouseMove(e: React.MouseEvent<HTMLCanvasElement>): void {
+
+  function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>): void {
     if (!drag) return;
     const r = e.currentTarget.getBoundingClientRect();
     setDrag({ ...drag, w: e.clientX - r.left - drag.x, h: e.clientY - r.top - drag.y });
   }
-  function onMouseUp(): void {
+
+  function onPointerUp(e: React.PointerEvent<HTMLCanvasElement>): void {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
     if (!drag) return;
     const c: CropRect = {
       x: drag.w < 0 ? drag.x + drag.w : drag.x,
@@ -87,9 +88,9 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
         setError(`${result.error}: ${'reason' in result ? result.reason : ''}`);
         return;
       }
-      setFontMatches(result.provider, result.matches);
+      useEditorStore.getState().setFontMatches(result.provider, result.matches);
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setWorking(false);
     }
@@ -100,7 +101,7 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
       try {
         await loadGoogleFontByUrl(match.googleFontsUrl);
       } catch {
-        // font load failure is non-fatal — text falls back to system fonts
+        // Font loading is optional; the editable text layer falls back to system fonts.
       }
     }
     addText('Sample text', {
@@ -116,7 +117,7 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
   if (!open) return null;
   void doc;
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2" onClick={onClose}>
       <div
         className="bg-ink-900 border border-ink-700 rounded-lg w-[1024px] max-w-[95vw] max-h-[92vh] overflow-y-auto p-5 scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
@@ -126,19 +127,21 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
           <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
         </header>
         <p className="text-sm text-zinc-400 mb-3">
-          Drag a rectangle around a region of text. The selection is sent to the font-id service. When no API keys are set we fall
-          back to local Google Fonts similarity.
+          Drag or touch a rectangle around a region of text. Font matching requires the optional font-ID service.
+          Without that service, you can still add text and enter a font family manually in the Properties panel.
         </p>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
+          <div className="min-w-0">
             <div className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Source</div>
-            <div className="relative inline-block">
+            <div className="relative inline-block max-w-full overflow-auto">
               <canvas
                 ref={sourceCanvasRef}
-                className="border border-ink-700"
-                onMouseDown={onMouseDown}
-                onMouseMove={onMouseMove}
-                onMouseUp={onMouseUp}
+                className="max-w-none border border-ink-700"
+                style={{ touchAction: 'none' }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
               />
               {drag && (
                 <div
@@ -159,9 +162,9 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
               )}
             </div>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Crop preview</div>
-            <canvas ref={previewRef} className="border border-ink-700 max-w-full" />
+            <canvas ref={previewRef} className="max-w-full border border-ink-700" />
             <button onClick={identify} disabled={!crop || working} className="mt-3 btn-accent">
               {working ? 'Identifying…' : 'Identify font'}
             </button>
@@ -171,11 +174,9 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
         <div className="mt-4 border-t border-ink-700 pt-4">
           <div className="flex items-center gap-2 mb-3">
             <h3 className="text-sm font-semibold">Top matches</h3>
-            {lastFontMatchProvider && (
-              <span className="text-xs text-zinc-500">via {lastFontMatchProvider}</span>
-            )}
+            {lastFontMatchProvider && <span className="text-xs text-zinc-500">via {lastFontMatchProvider}</span>}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2">
             {lastFontMatches.map((m, i) => (
               <div key={i} className="border border-ink-700 rounded p-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
@@ -184,9 +185,7 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
                     score {(m.score * 100).toFixed(0)}% · weight {m.weight ?? 'auto'} · {m.style ?? 'normal'}
                   </div>
                 </div>
-                <button onClick={() => clone(m)} className="btn-accent text-xs">
-                  Clone as text
-                </button>
+                <button onClick={() => clone(m)} className="btn-accent text-xs">Clone as text</button>
               </div>
             ))}
             {lastFontMatches.length === 0 && (

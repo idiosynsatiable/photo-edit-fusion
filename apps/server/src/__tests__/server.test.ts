@@ -57,7 +57,7 @@ describe('GET /api/integrations', () => {
     expect(names).toContain('fontspring');
     expect(names).toContain('remove-bg');
     expect(names).toContain('google-fonts-similarity');
-    expect(names).toContain('local-onnx-cut');
+    expect(names).toContain('local-basic-cut');
     expect(body.integrations.find((i) => i.name === 'whatthefont')!.enabled).toBe(false);
     expect(body.integrations.find((i) => i.name === 'google-fonts-similarity')!.enabled).toBe(true);
   });

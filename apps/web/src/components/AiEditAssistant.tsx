@@ -231,7 +231,7 @@ export function AiEditAssistant(): React.JSX.Element {
         <span className="rounded-full border border-ink-600 px-2 py-1 text-[10px] text-zinc-400">{geminiEnabled === null ? 'Checking Gemini…' : geminiEnabled ? 'Gemini connected' : 'Gemini not configured'}</span>
       </div>
 
-      {geminiEnabled === false && <p role="status" className="text-xs text-amber-300">Gemini is not configured on the server. Add GEMINI_API_KEY to the Railway server service variables to enable AI scanning and editing.</p>}
+      {geminiEnabled === false && <p role="status" className="text-xs text-amber-300">Cloud AI is unavailable while no optional AI server is connected. Your editing canvas, layers, masks, undo, autosave, and export continue to work offline. AI scene analysis and generative edits require a separately hosted server and a Gemini key.</p>}
       <label className="block text-xs text-zinc-300">
         Image to analyze
         <input

@@ -69,10 +69,9 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
   }
 
   async function runLocalApprox(dataUrl: string, bitmapId: string): Promise<void> {
-    // Local fallback: edge-aware luminance threshold. Not a true U2Net cutout but
-    // works without bundling a 50-200MB model. The packaged ONNX runtime
-    // integration is wired up in `local-onnx.worker.ts` and activates when a
-    // model file is dropped at apps/web/public/models/u2net.onnx.
+    // Local fallback: a lightweight corner-color threshold. This is not semantic
+    // segmentation and no ONNX model is bundled. Use Lasso or Magic Wand for
+    // cleanup when the background is complex or shares colors with the subject.
     const img = await loadImage(dataUrl);
     const c = document.createElement('canvas');
     c.width = img.naturalWidth;
@@ -137,6 +136,7 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
           <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
         </header>
         {!canRun && <div className="text-sm text-zinc-400 mb-3">Select an image layer to remove its background.</div>}
+        <p className="mb-3 text-xs text-amber-200/80">Offline Local mode uses a lightweight corner-color background remover, not semantic AI segmentation. It works without a server, but busy or multicolored backgrounds may need manual Lasso or Magic Wand cleanup.</p>
         <div className="flex items-center gap-3 mb-3 text-sm">
           <label className="flex items-center gap-2">
             <input type="radio" checked={provider === 'auto'} onChange={() => setProvider('auto')} /> Auto
