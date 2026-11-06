@@ -64,7 +64,7 @@ test('AI Studio requires explicit Gemini consent before sending an image', async
 test('shape tools add editable rectangle and ellipse layers', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Add rectangle shape').click();
-  await expect(page.getByText('Rectangle', { exact: false })).toBeVisible();
+  await expect(page.getByText('rectangle', { exact: false })).toBeVisible();
   await page.getByLabel('Add ellipse shape').click();
-  await expect(page.getByText('Ellipse', { exact: false })).toBeVisible();
+  await expect(page.getByText('ellipse', { exact: false })).toBeVisible();
 });
