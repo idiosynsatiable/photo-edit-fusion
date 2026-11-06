@@ -23,7 +23,7 @@ export function ToolsRail(): React.JSX.Element {
   const addText = useEditorStore((s) => s.addText);
 
   return (
-    <aside className="w-12 border-r border-ink-700 bg-ink-900 flex flex-col items-center py-2 gap-1">
+    <aside className="w-12 shrink-0 border-r border-ink-700 bg-ink-900 flex flex-col items-center py-2 gap-1">
       {TOOLS.map((t) => (
         <button
           key={t.id}
@@ -33,7 +33,7 @@ export function ToolsRail(): React.JSX.Element {
             setTool(t.id);
             if (t.id === 'text') addText('Type something');
           }}
-          className={`w-9 h-9 rounded-md flex items-center justify-center font-semibold ${
+          className={`w-9 h-9 shrink-0 rounded-md flex items-center justify-center font-semibold ${
             tool === t.id ? 'bg-pink-500 text-white' : 'text-zinc-300 hover:bg-ink-700'
           }`}
         >
