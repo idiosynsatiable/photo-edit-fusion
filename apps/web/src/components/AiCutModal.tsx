@@ -69,10 +69,9 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
   }
 
   async function runLocalApprox(dataUrl: string, bitmapId: string): Promise<void> {
-    // Local fallback: edge-aware luminance threshold. Not a true U2Net cutout but
-    // works without bundling a 50-200MB model. The packaged ONNX runtime
-    // integration is wired up in `local-onnx.worker.ts` and activates when a
-    // model file is dropped at apps/web/public/models/u2net.onnx.
+    // Local fallback: a lightweight corner-color threshold. This is not semantic
+    // segmentation and no ONNX model is bundled. Use Lasso or Magic Wand for
+    // cleanup when the background is complex or shares colors with the subject.
     const img = await loadImage(dataUrl);
     const c = document.createElement('canvas');
     c.width = img.naturalWidth;
