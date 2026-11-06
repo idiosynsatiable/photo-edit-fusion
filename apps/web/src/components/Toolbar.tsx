@@ -69,20 +69,20 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
   }
 
   return (
-    <header className="h-12 border-b border-ink-700 bg-ink-900 flex items-center px-3 gap-2 select-none">
-      <div className="font-semibold tracking-wide text-zinc-200">Photo Edit Fusion</div>
-      <div className="w-px h-6 bg-ink-700 mx-1" />
-      <button onClick={createBlankCanvas} className="btn">New Canvas</button>
-      <button onClick={() => fileRef.current?.click()} className="btn">Open Image</button>
-      <button onClick={() => projectRef.current?.click()} className="btn">Open Project</button>
-      <button onClick={exportProject} className="btn">Save Project</button>
-      <button onClick={exportPng} className="btn">Export PNG</button>
-      <div className="w-px h-6 bg-ink-700 mx-1" />
-      <button onClick={undo} disabled={!history.canUndo()} className="btn-ghost">Undo</button>
-      <button onClick={redo} disabled={!history.canRedo()} className="btn-ghost">Redo</button>
-      <div className="flex-1" />
-      <button onClick={onOpenAiCutModal} className="btn-accent">AI Cut</button>
-      <button onClick={onOpenFontModal} className="btn-accent">Extract Font</button>
+    <header className="h-12 min-h-12 shrink-0 border-b border-ink-700 bg-ink-900 flex flex-nowrap items-center overflow-x-auto px-3 gap-2 select-none">
+      <div className="shrink-0 font-semibold tracking-wide text-zinc-200">Photo Edit Fusion</div>
+      <div className="w-px h-6 bg-ink-700 mx-1 shrink-0" />
+      <button onClick={createBlankCanvas} className="btn shrink-0">New Canvas</button>
+      <button onClick={() => fileRef.current?.click()} className="btn shrink-0">Open Image</button>
+      <button onClick={() => projectRef.current?.click()} className="btn shrink-0">Open Project</button>
+      <button onClick={exportProject} className="btn shrink-0">Save Project</button>
+      <button onClick={exportPng} className="btn shrink-0">Export PNG</button>
+      <div className="w-px h-6 bg-ink-700 mx-1 shrink-0" />
+      <button onClick={undo} disabled={!history.canUndo()} className="btn-ghost shrink-0">Undo</button>
+      <button onClick={redo} disabled={!history.canRedo()} className="btn-ghost shrink-0">Redo</button>
+      <div className="flex-1 min-w-2" />
+      <button onClick={onOpenAiCutModal} className="btn-accent shrink-0">AI Cut</button>
+      <button onClick={onOpenFontModal} className="btn-accent shrink-0">Extract Font</button>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
       <input ref={projectRef} type="file" accept=".json,application/json" className="hidden" onChange={onPickProject} />
       <style>{`
