@@ -23,7 +23,7 @@ export function loadImage(dataUrl: string): Promise<HTMLImageElement> {
 }
 
 function safeFilename(filename: string): string {
-  return filename.replace(/[\\/:*?"<>|]/g, '_').trim() || 'photo-edit-fusion-export';
+  return filename.replace(/[\\\\\\/:*?"<>|]/g, '_').trim() || 'photo-edit-fusion-export';
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
