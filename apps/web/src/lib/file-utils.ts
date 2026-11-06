@@ -1,3 +1,7 @@
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+
 /** Read a File as a data URL. */
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,16 +22,59 @@ export function loadImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Trigger a browser download for a Blob. */
-export function downloadBlob(blob: Blob, filename: string): void {
+function safeFilename(filename: string): string {
+  return filename.replace(/[\\/:*?"<>|]/g, '_').trim() || 'photo-edit-fusion-export';
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Could not prepare export'));
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      const comma = dataUrl.indexOf(',');
+      if (comma < 0) reject(new Error('Could not encode export'));
+      else resolve(dataUrl.slice(comma + 1));
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Export through Android's native share sheet when running in Capacitor.
+ * In a browser/PWA, use the standard download attribute.
+ */
+export async function downloadBlob(blob: Blob, filename: string): Promise<void> {
+  const safeName = safeFilename(filename);
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const base64 = await blobToBase64(blob);
+      const saved = await Filesystem.writeFile({
+        path: safeName,
+        data: base64,
+        directory: Directory.Cache,
+        recursive: true,
+      });
+      await Share.share({
+        title: safeName,
+        text: 'Exported from Photo Edit Fusion',
+        url: saved.uri,
+        dialogTitle: 'Save or share your export',
+      });
+      return;
+    } catch {
+      // Fall through to the browser download path if native sharing is unavailable.
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = safeName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 /** Convert a base64 data URL fragment to a Uint8Array. */
