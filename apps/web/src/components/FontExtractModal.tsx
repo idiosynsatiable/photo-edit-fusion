@@ -136,7 +136,7 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
             <div className="relative inline-block max-w-full overflow-auto">
               <canvas
                 ref={sourceCanvasRef}
-                className="max-w-full border border-ink-700"
+                className="max-w-none border border-ink-700"
                 style={{ touchAction: 'none' }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
