@@ -57,14 +57,18 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
 
   function exportProject(): void {
     const json = toProjectFile(doc);
-    downloadBlob(new Blob([json], { type: 'application/json' }), `${doc.name}.pef.json`);
+    void downloadBlob(new Blob([json], { type: 'application/json' }), `${doc.name}.pef.json`).catch((error: unknown) => {
+      window.alert(error instanceof Error ? error.message : 'Project export failed.');
+    });
   }
 
   function exportPng(): void {
     const canvas = document.getElementById('pef-export-canvas') as HTMLCanvasElement | null;
     if (!canvas) return;
     canvas.toBlob((blob) => {
-      if (blob) downloadBlob(blob, `${doc.name}.png`);
+      if (blob) void downloadBlob(blob, `${doc.name}.png`).catch((error: unknown) => {
+        window.alert(error instanceof Error ? error.message : 'PNG export failed.');
+      });
     }, 'image/png');
   }
 
