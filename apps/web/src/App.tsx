@@ -42,9 +42,8 @@ export function App(): React.JSX.Element {
       read.onsuccess = () => {
         if (disposed) return;
         const current = useEditorStore.getState().doc;
-        if (read.result && current.layerOrder.length === 0 && current.name === 'Untitled') {
-          useEditorStore.getState().applyDoc(read.result);
-        }
+        const shouldRestoreSavedDocument = Boolean(read.result) && current.layerOrder.length === 0 && current.name === 'Untitled';
+        if (shouldRestoreSavedDocument) useEditorStore.getState().applyDoc(read.result);
         persistNow = () => {
           if (!db || disposed) return;
           if (saveTimer) clearTimeout(saveTimer);
@@ -72,6 +71,9 @@ export function App(): React.JSX.Element {
             }
           }, 500);
         });
+        // If the user edited before IndexedDB finished opening, keep and persist
+        // that live document instead of losing it or restoring over it.
+        if (!shouldRestoreSavedDocument) persistNow();
       };
     };
 
