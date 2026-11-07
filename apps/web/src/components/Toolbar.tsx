@@ -20,7 +20,7 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
     const dataUrl = await readFileAsDataUrl(file);
     const img = await loadImage(dataUrl);
     const nextDocument = createDocument({
-      name: file.name.replace(/\\.[^.]+$/, '') || 'Untitled',
+      name: file.name.replace(/\.[^.]+$/, '') || 'Untitled',
       width: img.naturalWidth,
       height: img.naturalHeight,
     });
