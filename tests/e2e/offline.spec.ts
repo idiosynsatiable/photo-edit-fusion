@@ -19,6 +19,12 @@ test('production PWA reloads after app shell is cached and network is removed', 
     const response = await page.evaluate(async (path) => fetch(path).then((result) => result.status), asset);
     expect(response).toBe(200);
   }
+  const manifest = await page.evaluate(async () => fetch('/tesseract/core/manifest.json').then((response) => response.json())) as { wasmFiles: string[] };
+  expect(manifest.wasmFiles.length).toBeGreaterThanOrEqual(4);
+  for (const file of manifest.wasmFiles) {
+    const response = await page.evaluate(async (name) => fetch('/tesseract/core/' + encodeURIComponent(name)).then((result) => result.status), file);
+    expect(response).toBe(200);
+  }
   await context.setOffline(true);
   for (const asset of localAssets) {
     const response = await page.evaluate(async (path) => fetch(path).then((result) => result.status), asset);
