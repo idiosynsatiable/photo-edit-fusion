@@ -171,7 +171,7 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
       try { await loadGoogleFontByUrl(match.googleFontsUrl); } catch { /* optional font download */ }
     }
     addText(extractedText.trim() || 'Sample text', {
-      fontFamily: [match.family, ...(match.fallbacks ?? [])].map((family) => family.includes(' ') ? `\"${family}\"` : family).join(', '),
+      fontFamily: [match.family, ...(match.fallbacks ?? [])].map((family) => family.includes(' ') ? `"${family}"` : family).join(', '),
       fontWeight: match.weight ?? 400,
       fontStyle: match.style ?? 'normal',
       fontSizePx: Math.max(18, Math.min(96, Math.round((crop?.h ?? 64) * 0.85))),
