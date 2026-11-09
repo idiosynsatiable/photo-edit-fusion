@@ -86,7 +86,12 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
     setError(null);
     let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
     try {
-      worker = await createWorker('eng', 1, {\n        workerPath: '/tesseract/worker.min.js',\n        langPath: '/tesseract/lang',\n        corePath: '/tesseract/core',\n        workerBlobURL: false,\n      });
+      worker = await createWorker('eng', 1, {
+        workerPath: '/tesseract/worker.min.js',
+        langPath: '/tesseract/lang',
+        corePath: '/tesseract/core',
+        workerBlobURL: false,
+      });
       const result = await worker.recognize(canvas);
       setExtractedText(result.data.text.trim());
       if (!result.data.text.trim()) setError('No readable text found. Try a tighter crop with larger, sharper lettering.');
