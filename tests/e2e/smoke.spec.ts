@@ -81,7 +81,7 @@ test('offline OCR worker, WASM core, and English model are bundled locally', asy
   const assets = [
     '/tesseract/worker.min.js',
     '/tesseract/core/tesseract-core.wasm.js',
-    '/tesseract/lang/eng.traineddata.gz',
+    '/tesseract/lang/eng.traineddata',
   ];
   for (const asset of assets) {
     const response = await request.get(asset);
