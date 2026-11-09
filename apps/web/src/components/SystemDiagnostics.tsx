@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 type Status = 'pass' | 'warn' | 'fail';
 interface Check { name: string; status: Status; detail: string; action?: string }
@@ -20,7 +20,7 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
     };
   }, [open]);
 
-  async function runChecks(): Promise<void> {
+  const runChecks = useCallback(async (): Promise<void> => {
     setRunning(true);
     const results: Check[] = [];
     const canvas = document.createElement('canvas');
@@ -74,11 +74,11 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
     });
     setChecks(results);
     setRunning(false);
-  }
+  }, []);
 
   useEffect(() => {
     if (open && checks.length === 0) void runChecks();
-  }, [open]);
+  }, [open, checks.length, runChecks]);
 
   if (!open) return null;
   const failures = checks.filter((item) => item.status === 'fail').length;
