@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { createWorker } from 'tesseract.js';
 
 type Status = 'pass' | 'warn' | 'fail';
 interface Check { name: string; status: Status; detail: string; action?: string }
@@ -52,6 +53,35 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
       } catch (error) {
         results.push({ name, status: 'fail', detail: error instanceof Error ? error.message : String(error), action: 'Reinstall a complete APK built with the local OCR asset-bundling step.' });
       }
+    }
+
+    let ocrWorker: Awaited<ReturnType<typeof createWorker>> | null = null;
+    try {
+      ocrWorker = await createWorker('eng', 1, {
+        workerPath: '/tesseract/worker.min.js',
+        langPath: '/tesseract/lang',
+        corePath: '/tesseract/core',
+        workerBlobURL: false,
+        gzip: false,
+      });
+      const sample = document.createElement('canvas');
+      sample.width = 420;
+      sample.height = 120;
+      const sampleContext = sample.getContext('2d');
+      if (!sampleContext) throw new Error('Could not create OCR verification canvas.');
+      sampleContext.fillStyle = '#ffffff';
+      sampleContext.fillRect(0, 0, sample.width, sample.height);
+      sampleContext.fillStyle = '#111111';
+      sampleContext.font = 'bold 48px Arial';
+      sampleContext.fillText('PEF OFFLINE TEST', 12, 78);
+      const recognized = await ocrWorker.recognize(sample);
+      const recognizedText = recognized.data.text.trim();
+      if (!recognizedText.toUpperCase().includes('PEF')) throw new Error('OCR engine loaded but did not recognize the local verification text: ' + (recognizedText || '(empty result)'));
+      results.push({ name: 'Offline OCR engine', status: 'pass', detail: 'Local worker, WASM core, and English model initialized and recognized a generated test image.' });
+    } catch (error) {
+      results.push({ name: 'Offline OCR engine', status: 'fail', detail: error instanceof Error ? error.message : String(error), action: 'Check that the APK contains the worker, WASM core, and uncompressed English model at the expected local paths.' });
+    } finally {
+      if (ocrWorker) await ocrWorker.terminate();
     }
 
     results.push({
