@@ -22,7 +22,8 @@
     "scan-secrets": "node scripts/scan-secrets.mjs",
     "scan-placeholders": "node scripts/scan-placeholders.mjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm scan-secrets && pnpm scan-placeholders && pnpm test",
-    "clean": "pnpm -r exec rm -rf dist node_modules .turbo && rm -rf node_modules"
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo && rm -rf node_modules",
+    "test:e2e:offline": "playwright test -c playwright.offline.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.0",
