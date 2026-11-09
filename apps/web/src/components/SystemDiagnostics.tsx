@@ -47,7 +47,7 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
     ] as const) {
       try {
         const response = await fetch(path, { method: 'HEAD', cache: 'no-store' });
-        if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         results.push({ name, status: 'pass', detail: 'Bundled local asset is reachable.' });
       } catch (error) {
         results.push({ name, status: 'fail', detail: error instanceof Error ? error.message : String(error), action: 'Reinstall a complete APK built with the local OCR asset-bundling step.' });
