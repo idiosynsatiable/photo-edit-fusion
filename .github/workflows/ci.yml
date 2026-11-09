@@ -58,6 +58,11 @@ jobs:
           CI: 'true'
           DEBUG: 'pw:webserver'
 
+      - name: Production PWA offline reload test
+        run: pnpm test:e2e:offline
+        env:
+          CI: 'true'
+
       - name: Upload Playwright diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
