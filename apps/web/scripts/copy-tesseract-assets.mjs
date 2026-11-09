@@ -1,11 +1,11 @@
 import { cp, mkdir, realpath, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const appRoot = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(appRoot, 'public', 'tesseract');
 const tesseractRoot = await realpath(join(appRoot, 'node_modules', 'tesseract.js'));
-const coreRoot = await realpath(join(tesseractRoot, 'node_modules', 'tesseract.js-core'));
+const coreRoot = await realpath(join(dirname(tesseractRoot), 'tesseract.js-core'));
 const languageRoot = await realpath(join(appRoot, 'node_modules', '@tesseract.js-data', 'eng'));
 const workerSource = join(tesseractRoot, 'dist', 'worker.min.js');
 const packageFiles = await readdir(coreRoot);
