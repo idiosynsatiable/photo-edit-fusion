@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write
-
 concurrency:
   group: photo-edit-fusion-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -32,26 +29,7 @@ jobs:
           node-version: '22.x'
 
       - name: Install
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Commit refreshed pnpm lockfile for same-repository PRs
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          if git ls-files --error-unmatch pnpm-lock.yaml >/dev/null 2>&1 && git diff --quiet -- pnpm-lock.yaml; then
-            echo "pnpm lockfile is already synchronized"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml
-          if git diff --cached --quiet; then
-            echo "no lockfile changes to commit"
-            exit 0
-          fi
-          git commit -m "chore: add resolved pnpm lockfile for Capacitor 8"
-          git fetch origin "$GITHUB_HEAD_REF"
-          git rebase "origin/$GITHUB_HEAD_REF"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
+        run: pnpm install --frozen-lockfile
 
       - name: Upload resolved dependency lockfile
         uses: actions/upload-artifact@v4
