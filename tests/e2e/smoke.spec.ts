@@ -9,7 +9,8 @@ test('app loads and shows toolbar', async ({ page }) => {
   console.log('E2E_ROOT_HTML:', (await page.locator('#root').innerHTML()).slice(0, 3000));
   await expect(page.getByText('Photo Edit Fusion')).toBeVisible();
   await expect(page.getByText('Open Image')).toBeVisible();
-  await expect(page.getByText('Extract Font')).toBeVisible();
+  await expect(page.getByText('Text + Font Ω')).toBeVisible();
+  await expect(page.getByText('Take Photo')).toBeVisible();
 });
 
 test('layers panel is empty on a fresh document', async ({ page }) => {
@@ -26,8 +27,8 @@ test('text tool adds a layer', async ({ page }) => {
 
 test('opening font extract modal is reachable', async ({ page }) => {
   await page.goto('/');
-  await page.getByText('Extract Font').click();
-  await expect(page.getByText('Extract Font from Crop')).toBeVisible();
+  await page.getByText('Text + Font Ω').click();
+  await expect(page.getByText('Ω Text & Font Extraction')).toBeVisible();
 });
 
 test('keyboard shortcut V switches to move tool', async ({ page }) => {
@@ -67,4 +68,23 @@ test('shape tools add editable rectangle and ellipse layers', async ({ page }) =
   await expect(page.getByText('rectangle', { exact: false })).toBeVisible();
   await page.getByLabel('Add ellipse shape').click();
   await expect(page.getByText('ellipse', { exact: false })).toBeVisible();
+});
+
+test('camera capture control is present for Android photo import', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Take Photo' }).click();
+  const cameraInput = page.locator('input[type="file"][capture="environment"]');
+  await expect(cameraInput).toHaveAttribute('accept', 'image/*');
+});
+
+test('offline OCR worker, WASM core, and English model are bundled locally', async ({ request }) => {
+  const assets = [
+    '/tesseract/worker.min.js',
+    '/tesseract/core/tesseract-core.wasm.js',
+    '/tesseract/lang/eng.traineddata.gz',
+  ];
+  for (const asset of assets) {
+    const response = await request.get(asset);
+    expect(response.ok(), `Expected bundled offline OCR asset: ${asset}`).toBeTruthy();
+  }
 });
