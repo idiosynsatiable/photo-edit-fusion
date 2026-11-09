@@ -58,9 +58,9 @@ jobs:
       - name: Verify offline OCR assets are bundled into Android web assets
         run: |
           test -s apps/web/dist/tesseract/worker.min.js
-          test -s apps/web/dist/tesseract/lang/eng.traineddata.gz
+          test -s apps/web/dist/tesseract/lang/eng.traineddata
           test -s android/app/src/main/assets/public/tesseract/worker.min.js
-          test -s android/app/src/main/assets/public/tesseract/lang/eng.traineddata.gz
+          test -s android/app/src/main/assets/public/tesseract/lang/eng.traineddata
 
       - name: Assemble debug APK
         working-directory: android
@@ -79,7 +79,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk | grep "package: name='com.idiosynsatiable.photoeditfusion'"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/public/tesseract/worker.min.js'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/public/tesseract/lang/eng.traineddata.gz'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/public/tesseract/lang/eng.traineddata'
 
       - name: Android emulator install and launch smoke test
         timeout-minutes: 30
