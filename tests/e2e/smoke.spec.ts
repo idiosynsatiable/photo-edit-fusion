@@ -99,3 +99,15 @@ test('System Check opens and reports local capabilities', async ({ page }) => {
   await expect(panel.getByText('English OCR model')).toBeVisible();
   await expect(panel.getByText('Offline OCR engine')).toBeVisible();
 });
+
+test('local photo import creates a correctly sized editable image document', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('input[type="file"][accept="image/*"]').first().setInputFiles({
+    name: 'sample-photo.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/XioAAAAASUVORK5CYII=', 'base64'),
+  });
+  await expect(page.getByText('sample-photo', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 × 1', { exact: true })).toBeVisible();
+  await expect(page.getByText('image', { exact: true })).toBeVisible();
+});
