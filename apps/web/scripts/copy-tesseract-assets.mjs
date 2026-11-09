@@ -13,15 +13,21 @@ const packageFiles = await readdir(coreRoot);
 const loaderFiles = packageFiles.filter((name) => /^tesseract-core.*\.wasm\.js$/.test(name));
 const coreFiles = packageFiles.filter((name) => name.startsWith('tesseract-core'));
 
+const wasmFiles = coreFiles.filter((name) => name.endsWith('.wasm'));
+
 if (loaderFiles.length < 4) {
   throw new Error('Expected all four Tesseract WASM loader variants, found ' + loaderFiles.length);
+}
+if (wasmFiles.length < 4) {
+  throw new Error('Expected four Tesseract WASM binaries, found ' + wasmFiles.length);
 }
 
 await mkdir(join(publicRoot, 'core'), { recursive: true });
 await mkdir(join(publicRoot, 'lang'), { recursive: true });
 await cp(workerSource, join(publicRoot, 'worker.min.js'));
 for (const file of coreFiles) await cp(join(coreRoot, file), join(publicRoot, 'core', file));
+await writeFile(join(publicRoot, 'core', 'manifest.json'), JSON.stringify({ files: coreFiles, wasmFiles }));
 const compressedLanguageData = await readFile(join(languageRoot, '4.0.0_best_int', 'eng.traineddata.gz'));
 await writeFile(join(publicRoot, 'lang', 'eng.traineddata'), gunzipSync(compressedLanguageData));
 
-console.log('Bundled local OCR assets: worker, ' + coreFiles.length + ' core files, uncompressed English traineddata.');
+console.log('Bundled local OCR assets: worker, ' + coreFiles.length + ' core files including ' + wasmFiles.length + ' WASM binaries, uncompressed English traineddata.');
