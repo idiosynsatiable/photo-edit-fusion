@@ -4,6 +4,7 @@ import { postFontIdentify } from '../lib/api.js';
 import { useEditorStore } from '../store/editor-store.js';
 import { loadGoogleFontByUrl } from '../lib/font-loader.js';
 import type { FontMatch } from '@pef/shared';
+import { binarizeOtsu, extractFeatures, LocalSimilarityProvider } from '@pef/font-match';
 
 interface Props { open: boolean; onClose: () => void }
 interface CropRect { x: number; y: number; w: number; h: number }
@@ -104,20 +105,63 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
   }
 
   async function identify(): Promise<void> {
-    const dst = previewRef.current;
-    if (!dst) return;
+    const canvas = previewRef.current;
+    if (!canvas) return;
     setWorking(true);
     setError(null);
+    let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
     try {
-      const result = await postFontIdentify(dst.toDataURL('image/png'));
-      if ('error' in result) {
-        setError(`${result.error}: ${'reason' in result ? result.reason : ''}`);
-        return;
+      worker = await createWorker('eng', 1, {
+        workerPath: '/tesseract/worker.min.js',
+        langPath: '/tesseract/lang',
+        corePath: '/tesseract/core',
+        workerBlobURL: false,
+      });
+      const recognition = await worker.recognize(canvas);
+      const ocr = recognition.data as unknown as {
+        text: string;
+        words?: Array<{ confidence: number; bbox: { x0: number; y0: number; x1: number; y1: number } }>;
+      };
+      if (ocr.text.trim()) setExtractedText(ocr.text.trim());
+      const image = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height);
+      if (!image) throw new Error('Could not read the selected text region.');
+      const boxes = (ocr.words ?? [])
+        .filter((word) => word.confidence >= 25)
+        .map((word) => ({
+          x: word.bbox.x0,
+          y: word.bbox.y0,
+          width: Math.max(1, word.bbox.x1 - word.bbox.x0),
+          height: Math.max(1, word.bbox.y1 - word.bbox.y0),
+        }));
+      const glyphBoxes = boxes.length ? boxes : [{ x: 0, y: 0, width: canvas.width, height: canvas.height }];
+      const features = extractFeatures(binarizeOtsu({
+        width: image.width,
+        height: image.height,
+        data: image.data,
+      }), image.width, image.height, glyphBoxes);
+      const local = await new LocalSimilarityProvider().identify({
+        imageBytes: new Uint8Array(image.data),
+        contentType: 'image/png',
+        sampleText: ocr.text.trim(),
+        features,
+        maxResults: 10,
+      });
+      useEditorStore.getState().setFontMatches(local.provider, local.matches);
+      if (navigator.onLine) {
+        try {
+          const remote = await postFontIdentify(canvas.toDataURL('image/png'));
+          if (!('error' in remote) && remote.matches.length) {
+            useEditorStore.getState().setFontMatches(remote.provider, remote.matches);
+          }
+        } catch {
+          // Local ranked matches remain available when the optional API is offline.
+        }
       }
-      useEditorStore.getState().setFontMatches(result.provider, result.matches);
+      if (!local.matches.length) setError('No close font candidates were found. Try a larger, higher-contrast crop.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e instanceof Error ? e.message : 'Font identification failed.');
     } finally {
+      if (worker) await worker.terminate();
       setWorking(false);
     }
   }
