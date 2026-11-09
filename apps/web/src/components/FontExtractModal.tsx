@@ -117,6 +117,7 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
         langPath: '/tesseract/lang',
         corePath: '/tesseract/core',
         workerBlobURL: false,
+        gzip: false,
       });
       const recognition = await worker.recognize(canvas);
       const ocr = recognition.data as unknown as {
