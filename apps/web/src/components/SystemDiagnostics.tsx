@@ -44,6 +44,7 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
     for (const [name, path] of [
       ['OCR worker', '/tesseract/worker.min.js'],
       ['OCR WebAssembly core', '/tesseract/core/tesseract-core.wasm.js'],
+      ['OCR core manifest', '/tesseract/core/manifest.json'],
       ['English OCR model', '/tesseract/lang/eng.traineddata'],
     ] as const) {
       try {
@@ -53,6 +54,21 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
       } catch (error) {
         results.push({ name, status: 'fail', detail: error instanceof Error ? error.message : String(error), action: 'Reinstall a complete APK built with the local OCR asset-bundling step.' });
       }
+    }
+
+    try {
+      const manifestResponse = await fetch('/tesseract/core/manifest.json', { cache: 'no-store' });
+      if (!manifestResponse.ok) throw new Error('OCR core manifest is missing.');
+      const manifest = await manifestResponse.json() as { wasmFiles?: string[] };
+      const wasmFiles = manifest.wasmFiles ?? [];
+      if (wasmFiles.length < 4) throw new Error('Expected four local OCR WASM binaries; found ' + wasmFiles.length + '.');
+      for (const file of wasmFiles) {
+        const response = await fetch('/tesseract/core/' + encodeURIComponent(file), { method: 'HEAD', cache: 'no-store' });
+        if (!response.ok) throw new Error('Missing OCR WASM binary: ' + file);
+      }
+      results.push({ name: 'OCR WASM binaries', status: 'pass', detail: wasmFiles.length + ' local WebAssembly binaries are present and reachable.' });
+    } catch (error) {
+      results.push({ name: 'OCR WASM binaries', status: 'fail', detail: error instanceof Error ? error.message : String(error), action: 'Rebuild and reinstall the APK with the complete Tesseract core package.' });
     }
 
     let ocrWorker: Awaited<ReturnType<typeof createWorker>> | null = null;
