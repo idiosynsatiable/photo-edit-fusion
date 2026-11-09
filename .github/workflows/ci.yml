@@ -49,6 +49,8 @@ jobs:
             exit 0
           fi
           git commit -m "chore: add resolved pnpm lockfile for Capacitor 8"
+          git fetch origin "$GITHUB_HEAD_REF"
+          git rebase "origin/$GITHUB_HEAD_REF"
           git push origin "HEAD:${GITHUB_HEAD_REF}"
 
       - name: Upload resolved dependency lockfile
