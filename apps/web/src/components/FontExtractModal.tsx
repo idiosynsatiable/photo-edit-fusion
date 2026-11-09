@@ -92,6 +92,7 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
         langPath: '/tesseract/lang',
         corePath: '/tesseract/core',
         workerBlobURL: false,
+        gzip: false,
       });
       const result = await worker.recognize(canvas);
       setExtractedText(result.data.text.trim());
