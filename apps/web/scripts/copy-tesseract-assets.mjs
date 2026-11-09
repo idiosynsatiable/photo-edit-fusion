@@ -22,4 +22,4 @@ await cp(workerSource, join(publicRoot, 'worker.min.js'));
 for (const file of coreFiles) await cp(join(coreRoot, file), join(publicRoot, 'core', file));
 await cp(join(languageRoot, '4.0.0_best_int', 'eng.traineddata.gz'), join(publicRoot, 'lang', 'eng.traineddata.gz'));
 
-console.log(\`Bundled local OCR assets: worker, \${coreFiles.length} WASM loaders, English traineddata.\`);
+console.log('Bundled local OCR assets: worker, ' + coreFiles.length + ' core files, English traineddata.');
