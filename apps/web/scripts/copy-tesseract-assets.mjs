@@ -8,10 +8,12 @@ const tesseractRoot = await realpath(join(appRoot, 'node_modules', 'tesseract.js
 const coreRoot = await realpath(join(tesseractRoot, 'node_modules', 'tesseract.js-core'));
 const languageRoot = await realpath(join(appRoot, 'node_modules', '@tesseract.js-data', 'eng'));
 const workerSource = join(tesseractRoot, 'dist', 'worker.min.js');
-const coreFiles = (await readdir(coreRoot)).filter((name) => /^tesseract-core.*\.wasm\.js$/.test(name));
+const packageFiles = await readdir(coreRoot);
+const loaderFiles = packageFiles.filter((name) => /^tesseract-core.*\.wasm\.js$/.test(name));
+const coreFiles = packageFiles.filter((name) => name.startsWith('tesseract-core'));
 
-if (coreFiles.length < 4) {
-  throw new Error(\`Expected all four Tesseract WASM loader variants, found \${coreFiles.length}\`);
+if (loaderFiles.length < 4) {
+  throw new Error('Expected all four Tesseract WASM loader variants, found ' + loaderFiles.length);
 }
 
 await mkdir(join(publicRoot, 'core'), { recursive: true });
