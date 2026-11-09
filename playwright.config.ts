@@ -11,7 +11,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm run dev -- --host 127.0.0.1',
+    command: 'pnpm run predev && pnpm exec vite --host 127.0.0.1',
     cwd: 'apps/web',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
