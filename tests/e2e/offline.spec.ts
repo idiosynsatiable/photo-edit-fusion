@@ -13,7 +13,7 @@ test('production PWA reloads after app shell is cached and network is removed', 
   const localAssets = [
     '/tesseract/worker.min.js',
     '/tesseract/core/tesseract-core.wasm.js',
-    '/tesseract/lang/eng.traineddata.gz',
+    '/tesseract/lang/eng.traineddata',
   ];
   for (const asset of localAssets) {
     const response = await page.evaluate(async (path) => fetch(path).then((result) => result.status), asset);
