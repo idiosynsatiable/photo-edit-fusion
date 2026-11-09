@@ -8,6 +8,7 @@ import { StatusBar } from './components/StatusBar.js';
 import { FontExtractModal } from './components/FontExtractModal.js';
 import { AiCutModal } from './components/AiCutModal.js';
 import { AiEditAssistant } from './components/AiEditAssistant.js';
+import { SystemDiagnostics } from './components/SystemDiagnostics.js';
 import { useEditorStore } from './store/editor-store.js';
 import { useKeyboardShortcuts } from './hooks/use-keyboard-shortcuts.js';
 
@@ -15,6 +16,7 @@ export function App(): React.JSX.Element {
   const [fontModalOpen, setFontModalOpen] = useState(false);
   const [aiCutModalOpen, setAiCutModalOpen] = useState(false);
   const [aiStudioOpen, setAiStudioOpen] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const tool = useEditorStore((s) => s.activeTool);
 
   useKeyboardShortcuts();
@@ -104,6 +106,8 @@ export function App(): React.JSX.Element {
         </div>
       </div>
       <StatusBar />
+      <button className="fixed bottom-8 left-4 z-30 rounded-full border border-emerald-900 bg-ink-900 px-4 py-2 text-xs font-semibold text-emerald-200 shadow-lg" onClick={() => setDiagnosticsOpen(true)}>Ω System Check</button>
+      <SystemDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
       <button
         className="fixed bottom-8 right-4 z-30 rounded-full border border-cyan-800 bg-ink-900 px-4 py-2 text-xs font-semibold text-cyan-200 shadow-lg"
         onClick={() => setAiStudioOpen((open) => !open)}
