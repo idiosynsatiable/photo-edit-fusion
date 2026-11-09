@@ -97,4 +97,5 @@ test('System Check opens and reports local capabilities', async ({ page }) => {
   await expect(panel.getByText('Canvas renderer')).toBeVisible();
   await expect(panel.getByText('OCR worker')).toBeVisible();
   await expect(panel.getByText('English OCR model')).toBeVisible();
+  await expect(panel.getByText('Offline OCR engine')).toBeVisible();
 });
