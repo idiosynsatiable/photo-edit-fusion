@@ -72,7 +72,7 @@ test('shape tools add editable rectangle and ellipse layers', async ({ page }) =
 
 test('camera capture control is present for Android photo import', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Take Photo' }).click();
+  await expect(page.getByRole('button', { name: 'Take Photo' })).toBeVisible();
   const cameraInput = page.locator('input[type="file"][capture="environment"]');
   await expect(cameraInput).toHaveAttribute('accept', 'image/*');
 });
@@ -87,4 +87,14 @@ test('offline OCR worker, WASM core, and English model are bundled locally', asy
     const response = await request.get(asset);
     expect(response.ok(), `Expected bundled offline OCR asset: ${asset}`).toBeTruthy();
   }
+});
+
+test('System Check opens and reports local capabilities', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Ω System Check' }).click();
+  const panel = page.getByRole('dialog', { name: 'System diagnostics' });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText('Canvas renderer')).toBeVisible();
+  await expect(panel.getByText('OCR worker')).toBeVisible();
+  await expect(panel.getByText('English OCR model')).toBeVisible();
 });
