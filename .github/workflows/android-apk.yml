@@ -27,18 +27,18 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '22.x'
 
       - name: Install Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools emulator platforms;android-35 build-tools;35.0.0'
+          packages: 'platform-tools emulator platforms;android-36 build-tools;36.0.0'
 
       - name: Install workspace dependencies
         run: pnpm install --no-frozen-lockfile
@@ -76,8 +76,9 @@ jobs:
 
       - name: Verify APK metadata and signature
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk | grep "package: name='com.idiosynsatiable.photoeditfusion'"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk | grep "package: name='com.idiosynsatiable.photoeditfusion'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk | grep "targetSdkVersion:'36'"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/public/tesseract/worker.min.js'
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/public/tesseract/lang/eng.traineddata'
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/public/tesseract/core/manifest.json'
@@ -88,7 +89,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           emulator-boot-timeout: 900
-          api-level: 35
+          api-level: 36
           target: google_apis
           arch: x86_64
           profile: pixel_6
