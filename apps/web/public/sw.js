@@ -24,7 +24,7 @@ self.addEventListener('fetch', (event) => {
       fetch(request).then((response) => {
         if (response.ok) {
           const copy = response.clone();
-          void caches.open(CACHE_NAME).then((cache) => cache.put('./', copy));
+          await caches.open(CACHE_NAME).then((cache) => cache.put('./', copy));
         }
         return response;
       }).catch(async () => (await caches.match('./')) || Response.error()),
