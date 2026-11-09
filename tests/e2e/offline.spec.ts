@@ -10,7 +10,20 @@ test('production PWA reloads after app shell is cached and network is removed', 
   await page.reload();
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBeTruthy();
   await expect(page.getByText('Open Image')).toBeVisible();
+  const localAssets = [
+    '/tesseract/worker.min.js',
+    '/tesseract/core/tesseract-core.wasm.js',
+    '/tesseract/lang/eng.traineddata.gz',
+  ];
+  for (const asset of localAssets) {
+    const response = await page.evaluate(async (path) => fetch(path).then((result) => result.status), asset);
+    expect(response).toBe(200);
+  }
   await context.setOffline(true);
+  for (const asset of localAssets) {
+    const response = await page.evaluate(async (path) => fetch(path).then((result) => result.status), asset);
+    expect(response).toBe(200);
+  }
   await page.reload();
   await expect(page.getByText('Open Image')).toBeVisible();
   await expect(page.getByText('Text + Font Ω')).toBeVisible();
