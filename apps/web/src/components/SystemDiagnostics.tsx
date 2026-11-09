@@ -43,7 +43,7 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
     for (const [name, path] of [
       ['OCR worker', '/tesseract/worker.min.js'],
       ['OCR WebAssembly core', '/tesseract/core/tesseract-core.wasm.js'],
-      ['English OCR model', '/tesseract/lang/eng.traineddata.gz'],
+      ['English OCR model', '/tesseract/lang/eng.traineddata'],
     ] as const) {
       try {
         const response = await fetch(path, { method: 'HEAD', cache: 'no-store' });
