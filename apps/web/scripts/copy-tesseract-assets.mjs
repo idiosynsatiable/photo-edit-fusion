@@ -1,6 +1,7 @@
-import { cp, mkdir, realpath, readdir } from 'node:fs/promises';
+import { cp, mkdir, realpath, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync } from 'node:zlib';
 
 const appRoot = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(appRoot, 'public', 'tesseract');
@@ -20,6 +21,7 @@ await mkdir(join(publicRoot, 'core'), { recursive: true });
 await mkdir(join(publicRoot, 'lang'), { recursive: true });
 await cp(workerSource, join(publicRoot, 'worker.min.js'));
 for (const file of coreFiles) await cp(join(coreRoot, file), join(publicRoot, 'core', file));
-await cp(join(languageRoot, '4.0.0_best_int', 'eng.traineddata.gz'), join(publicRoot, 'lang', 'eng.traineddata.gz'));
+const compressedLanguageData = await readFile(join(languageRoot, '4.0.0_best_int', 'eng.traineddata.gz'));
+await writeFile(join(publicRoot, 'lang', 'eng.traineddata'), gunzipSync(compressedLanguageData));
 
-console.log('Bundled local OCR assets: worker, ' + coreFiles.length + ' core files, English traineddata.');
+console.log('Bundled local OCR assets: worker, ' + coreFiles.length + ' core files, uncompressed English traineddata.');
