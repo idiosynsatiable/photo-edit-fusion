@@ -9,7 +9,6 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
   const [runtimeErrors, setRuntimeErrors] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!open) return;
     const onError = (event: ErrorEvent) => setRuntimeErrors((items) => [...items.slice(-9), event.message || 'Unhandled application error']);
     const onRejection = (event: PromiseRejectionEvent) => setRuntimeErrors((items) => [...items.slice(-9), String(event.reason ?? 'Unhandled promise rejection')]);
     window.addEventListener('error', onError);
@@ -59,6 +58,14 @@ export function SystemDiagnostics({ open, onClose }: { open: boolean; onClose: (
       name: 'Network state',
       status: navigator.onLine ? 'pass' : 'pass',
       detail: navigator.onLine ? 'Network available. Core editing should not require it.' : 'Airplane/offline state detected. This is expected for offline testing.',
+    });
+    const serviceWorkerSupported = 'serviceWorker' in navigator;
+    const serviceWorkerReady = serviceWorkerSupported && Boolean(navigator.serviceWorker.controller);
+    results.push({
+      name: 'Service worker',
+      status: serviceWorkerReady ? 'pass' : 'warn',
+      detail: serviceWorkerReady ? 'This page is controlled by the offline app-shell worker.' : 'No active service-worker controller is attached to this page yet.',
+      action: 'For PWA testing, load once online and reload after the service worker activates. Android APK assets are bundled locally.',
     });
     results.push({
       name: 'PWA offline cache',
