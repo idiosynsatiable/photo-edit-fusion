@@ -112,3 +112,28 @@ test('local photo import creates a correctly sized editable image document', asy
   await expect(page.getByText('1 × 1', { exact: true })).toBeVisible();
   await expect(page.getByText('image', { exact: true })).toBeVisible();
 });
+
+test('mobile photo import auto-fits the complete editable canvas inside the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200"><rect width="1600" height="1200" fill="#ff0000"/></svg>';
+  await page.locator('input[type="file"][accept="image/*"]').first().setInputFiles({
+    name: 'mobile-fit-test.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from(svg),
+  });
+  const stage = page.getByTestId('canvas-stage');
+  const canvas = page.getByTestId('editor-canvas');
+  await expect(canvas).toBeVisible();
+  await expect.poll(async () => canvas.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    const bounds = node.closest('[data-testid="canvas-stage"]')!.getBoundingClientRect();
+    return rect.width > 100 && rect.width <= bounds.width && rect.height <= bounds.height;
+  })).toBeTruthy();
+  await expect.poll(async () => canvas.evaluate((node) => {
+    const c = node as HTMLCanvasElement;
+    const pixel = c.getContext('2d')?.getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data;
+    return Boolean(pixel && pixel[0] > 240 && pixel[1] < 20 && pixel[2] < 20);
+  })).toBeTruthy();
+  await expect(stage).toBeVisible();
+});
