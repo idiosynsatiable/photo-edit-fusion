@@ -17,6 +17,7 @@ export function App(): React.JSX.Element {
   const [aiCutModalOpen, setAiCutModalOpen] = useState(false);
   const [aiStudioOpen, setAiStudioOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [mobilePanelsOpen, setMobilePanelsOpen] = useState(false);
   const tool = useEditorStore((s) => s.activeTool);
 
   useKeyboardShortcuts();
@@ -100,11 +101,12 @@ export function App(): React.JSX.Element {
       <div className="min-h-0 flex-1 flex overflow-hidden">
         <ToolsRail />
         <CanvasStage />
-        <div className="w-72 max-sm:w-32 shrink-0 border-l border-ink-700 flex flex-col">
+        <div className={`${mobilePanelsOpen ? "flex" : "hidden"} sm:flex w-72 max-sm:w-40 shrink-0 border-l border-ink-700 flex-col`}>
           <LayersPanel />
           <PropertiesPanel />
         </div>
       </div>
+      <button type="button" onClick={() => setMobilePanelsOpen((open) => !open)} className="fixed right-2 top-14 z-30 rounded-full border border-ink-600 bg-ink-900/95 px-3 py-2 text-xs font-semibold text-zinc-100 shadow-lg sm:hidden">{mobilePanelsOpen ? "Close panels" : "Layers & tools"}</button>
       <StatusBar />
       <button className="fixed bottom-8 left-4 z-30 max-sm:hidden rounded-full border border-emerald-900 bg-ink-900 px-4 py-2 text-xs font-semibold text-emerald-200 shadow-lg" onClick={() => setDiagnosticsOpen(true)}>Ω System Check</button>
       <SystemDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
