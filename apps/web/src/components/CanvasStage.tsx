@@ -267,8 +267,8 @@ export function CanvasStage(): React.JSX.Element {
       <div
         className="relative shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
         style={{
-          width: doc.width * zoom,
-          height: doc.height * zoom,
+          width: doc.width * displayScale,
+          height: doc.height * displayScale,
           transformOrigin: 'top left',
           touchAction: 'none',
         }}
@@ -279,6 +279,7 @@ export function CanvasStage(): React.JSX.Element {
       >
         <canvas
           ref={canvasRef}
+          data-testid="editor-canvas"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
         />
         <canvas
