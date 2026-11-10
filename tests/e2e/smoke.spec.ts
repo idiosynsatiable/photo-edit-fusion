@@ -15,7 +15,7 @@ test('app loads and shows toolbar', async ({ page }) => {
 
 test('layers panel is empty on a fresh document', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('Layers')).toBeVisible();
+  await expect(page.getByText('Layers', { exact: true })).toBeVisible();
   await expect(page.getByText(/get started/)).toBeVisible();
 });
 
