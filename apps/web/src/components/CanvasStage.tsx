@@ -25,6 +25,29 @@ export function CanvasStage(): React.JSX.Element {
   const [lassoPoints, setLassoPoints] = useState<Vec2[]>([]);
   const [drawing, setDrawing] = useState(false);
   const [dragOffset, setDragOffset] = useState<Vec2 | null>(null);
+  const [fitScale, setFitScale] = useState(1);
+  const displayScale = fitScale * zoom;
+
+  // Fit the full document inside the actual editor viewport. Imported photos
+  // are often several thousand pixels wide; rendering at 1:1 made the canvas
+  // extend beyond the phone screen and appear blank/off-screen.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const updateFit = () => {
+      const style = window.getComputedStyle(stage);
+      const horizontalPadding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+      const verticalPadding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
+      const availableWidth = Math.max(1, stage.clientWidth - horizontalPadding - 8);
+      const availableHeight = Math.max(1, stage.clientHeight - verticalPadding - 8);
+      const nextFit = Math.min(2, availableWidth / doc.width, availableHeight / doc.height);
+      setFitScale(Math.max(0.02, nextFit));
+    };
+    updateFit();
+    const observer = new ResizeObserver(updateFit);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [doc.width, doc.height]);
 
   // Render whenever doc changes
   useEffect(() => {
@@ -52,7 +75,7 @@ export function CanvasStage(): React.JSX.Element {
   }, [doc]);
 
   // Redraw overlay (selection/marquee) when overlay-relevant state changes
-  useEffect(drawOverlay, [lassoPoints, selectedLayerId, doc]);
+  useEffect(drawOverlay, [lassoPoints, selectedLayerId, doc, displayScale]);
 
   function drawOverlay(): void {
     const c = overlayRef.current;
@@ -83,8 +106,8 @@ export function CanvasStage(): React.JSX.Element {
         ctx.rotate(layer.transform.rotation);
         ctx.scale(layer.transform.scale.x, layer.transform.scale.y);
         ctx.strokeStyle = '#06b6d4';
-        ctx.lineWidth = 2 / zoom;
-        ctx.setLineDash([6 / zoom, 4 / zoom]);
+        ctx.lineWidth = 2 / displayScale;
+        ctx.setLineDash([6 / displayScale, 4 / displayScale]);
         ctx.strokeRect(-w * layer.transform.anchor.x, -h * layer.transform.anchor.y, w, h);
         ctx.restore();
       }
@@ -240,7 +263,7 @@ export function CanvasStage(): React.JSX.Element {
   }
 
   return (
-    <div ref={stageRef} className="min-w-0 min-h-0 flex-1 overflow-auto bg-[#0e0e12] p-8 max-sm:p-2 flex items-center justify-center" onWheel={onWheel}>
+    <div ref={stageRef} className="relative min-w-0 min-h-0 flex-1 overflow-auto bg-[#0e0e12] p-8 max-sm:p-2 flex items-center justify-center" onWheel={onWheel}>
       <div
         className="relative shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
         style={{
@@ -256,12 +279,18 @@ export function CanvasStage(): React.JSX.Element {
       >
         <canvas
           ref={canvasRef}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
         />
         <canvas
           ref={overlayRef}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', display: 'block' }}
         />
+      </div>
+      <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/80 px-3 py-2 text-xs text-white shadow-lg backdrop-blur">
+        <button type="button" onClick={() => setZoom(1)} className="rounded px-2 py-1 hover:bg-white/10">Fit</button>
+        <span className="tabular-nums">{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => setZoom(zoom / 1.2)} aria-label="Zoom out" className="rounded px-2 py-1 hover:bg-white/10">−</button>
+        <button type="button" onClick={() => setZoom(zoom * 1.2)} aria-label="Zoom in" className="rounded px-2 py-1 hover:bg-white/10">+</button>
       </div>
       <canvas ref={exportCanvasRef} id="pef-export-canvas" style={{ display: 'none' }} />
     </div>
