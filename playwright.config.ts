@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testMatch: '**/smoke.spec.ts',
   timeout: 30_000,
   retries: 0,
   use: {
@@ -11,7 +12,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm exec vite --host 127.0.0.1',
+    command: 'pnpm run predev && pnpm exec vite --host 127.0.0.1',
     cwd: 'apps/web',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,

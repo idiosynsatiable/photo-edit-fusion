@@ -1,0 +1,41 @@
+import { test, expect } from '@playwright/test';
+
+test('production PWA reloads after app shell is cached and network is removed', async ({ page, context }) => {
+  await page.goto('/');
+  await expect(page.getByText('Photo Edit Fusion Ω')).toBeVisible();
+  await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) throw new Error('Service workers are not supported in this browser.');
+  });
+  await page.waitForFunction(async () => Boolean(await navigator.serviceWorker.getRegistration()), undefined, { timeout: 15000 });
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBeTruthy();
+  await expect(page.getByText('Open Image')).toBeVisible();
+  const localAssets = [
+    '/tesseract/worker.min.js',
+    '/tesseract/core/tesseract-core.wasm.js',
+    '/tesseract/lang/eng.traineddata',
+  ];
+  for (const asset of localAssets) {
+    const response = await page.evaluate(async (path) => fetch(path).then((result) => result.status), asset);
+    expect(response).toBe(200);
+  }
+  const manifest = await page.evaluate(async () => fetch('/tesseract/core/manifest.json').then((response) => response.json())) as { wasmFiles: string[] };
+  expect(manifest.wasmFiles.length).toBeGreaterThanOrEqual(4);
+  for (const file of manifest.wasmFiles) {
+    const response = await page.evaluate(async (name) => fetch('/tesseract/core/' + encodeURIComponent(name)).then((result) => result.status), file);
+    expect(response).toBe(200);
+  }
+  await context.setOffline(true);
+  for (const file of manifest.wasmFiles) {
+    const response = await page.evaluate(async (name) => fetch('/tesseract/core/' + encodeURIComponent(name)).then((result) => result.status), file);
+    expect(response).toBe(200);
+  }
+  for (const asset of localAssets) {
+    const response = await page.evaluate(async (path) => fetch(path).then((result) => result.status), asset);
+    expect(response).toBe(200);
+  }
+  await page.reload();
+  await expect(page.getByText('Open Image')).toBeVisible();
+  await expect(page.getByText('Text + Font Ω')).toBeVisible();
+});

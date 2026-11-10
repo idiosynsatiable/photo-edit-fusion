@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prebuild": "node scripts/copy-tesseract-assets.mjs",
+    "predev": "node scripts/copy-tesseract-assets.mjs"
   },
   "dependencies": {
     "@pef/canvas-engine": "workspace:*",
@@ -17,13 +19,14 @@
     "@pef/filters": "workspace:*",
     "@pef/font-match": "workspace:*",
     "@pef/shared": "workspace:*",
-    "@capacitor/core": "^6.2.1",
-    "@capacitor/filesystem": "^6.0.0",
-    "@capacitor/share": "^6.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/share": "^8.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tesseract.js": "^5.1.1",
-    "zustand": "^5.0.0"
+    "zustand": "^5.0.0",
+    "@tesseract.js-data/eng": "1.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",
