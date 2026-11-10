@@ -100,16 +100,16 @@ export function App(): React.JSX.Element {
       <div className="min-h-0 flex-1 flex overflow-hidden">
         <ToolsRail />
         <CanvasStage />
-        <div className="w-72 max-sm:w-40 shrink-0 border-l border-ink-700 flex flex-col">
+        <div className="w-72 max-sm:w-32 shrink-0 border-l border-ink-700 flex flex-col">
           <LayersPanel />
           <PropertiesPanel />
         </div>
       </div>
       <StatusBar />
-      <button className="fixed bottom-8 left-4 z-30 rounded-full border border-emerald-900 bg-ink-900 px-4 py-2 text-xs font-semibold text-emerald-200 shadow-lg" onClick={() => setDiagnosticsOpen(true)}>Ω System Check</button>
+      <button className="fixed bottom-8 left-4 z-30 max-sm:hidden rounded-full border border-emerald-900 bg-ink-900 px-4 py-2 text-xs font-semibold text-emerald-200 shadow-lg" onClick={() => setDiagnosticsOpen(true)}>Ω System Check</button>
       <SystemDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
       <button
-        className="fixed bottom-8 right-4 z-30 rounded-full border border-cyan-800 bg-ink-900 px-4 py-2 text-xs font-semibold text-cyan-200 shadow-lg"
+        className="fixed bottom-8 right-4 z-30 max-sm:hidden rounded-full border border-cyan-800 bg-ink-900 px-4 py-2 text-xs font-semibold text-cyan-200 shadow-lg"
         onClick={() => setAiStudioOpen((open) => !open)}
         aria-expanded={aiStudioOpen}
       >
