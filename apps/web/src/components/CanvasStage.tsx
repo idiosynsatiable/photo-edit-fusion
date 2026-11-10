@@ -263,7 +263,7 @@ export function CanvasStage(): React.JSX.Element {
   }
 
   return (
-    <div ref={stageRef} className="relative min-w-0 min-h-0 flex-1 overflow-auto bg-[#0e0e12] p-8 max-sm:p-2 flex items-center justify-center" onWheel={onWheel}>
+    <div ref={stageRef} data-testid="canvas-stage" className="relative min-w-0 min-h-0 flex-1 overflow-auto bg-[#0e0e12] p-8 max-sm:p-2 flex items-center justify-center" onWheel={onWheel}>
       <div
         className="relative shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
         style={{
