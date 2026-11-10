@@ -51,6 +51,7 @@ jobs:
 
       - name: Configure protected release signing
         env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-signing/upload-key.jks
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -91,9 +92,6 @@ jobs:
           s = s.replace(release_marker, release_marker + "\n            signingConfig signingConfigs.release", 1)
           p.write_text(s)
           PY
-        env:
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-signing/upload-key.jks
-
       - name: Build signed release AAB
         working-directory: android
         run: ./gradlew --no-daemon bundleRelease
@@ -109,7 +107,6 @@ jobs:
           AAB="android/app/build/outputs/bundle/release/app-release.aab"
           test -s "$AAB"
           jarsigner -verify -verbose -certs "$AAB" >/dev/null
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk 2>/dev/null || true
           echo "Signed AAB verification passed."
 
       - name: Upload signed AAB
