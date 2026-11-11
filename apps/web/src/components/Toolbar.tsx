@@ -14,7 +14,8 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
   const doc = useEditorStore((s) => s.doc);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
-  const history = useEditorStore((s) => s.history);
+  const canUndo = useEditorStore((s) => s.canUndo);
+  const canRedo = useEditorStore((s) => s.canRedo);
 
   async function loadPhoto(file: File): Promise<void> {
     const dataUrl = await readFileAsDataUrl(file);
@@ -92,8 +93,8 @@ export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX
       <button onClick={exportProject} className="btn shrink-0">Save Project</button>
       <button onClick={exportPng} className="btn shrink-0">Export PNG</button>
       <div className="w-px h-6 bg-ink-700 mx-1 shrink-0" />
-      <button onClick={undo} disabled={!history.canUndo()} className="btn-ghost shrink-0">Undo</button>
-      <button onClick={redo} disabled={!history.canRedo()} className="btn-ghost shrink-0">Redo</button>
+      <button onClick={undo} disabled={!canUndo} aria-label="Undo last edit" title="Undo last edit" className="btn-ghost shrink-0">Undo</button>
+      <button onClick={redo} disabled={!canRedo} aria-label="Redo last undone edit" title="Redo last undone edit" className="btn-ghost shrink-0">Redo</button>
       <div className="flex-1 min-w-2" />
       <button onClick={onOpenAiCutModal} className="btn-accent shrink-0">AI Cut</button>
       <button onClick={onOpenFontModal} className="btn-accent shrink-0">Text + Font Ω</button>
