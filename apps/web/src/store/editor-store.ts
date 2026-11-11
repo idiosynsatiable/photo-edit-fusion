@@ -25,6 +25,9 @@ export type ToolId =
 
 interface EditorState {
   history: History;
+  /** Reactive snapshots: History mutates internally, so UI must not subscribe to its identity. */
+  canUndo: boolean;
+  canRedo: boolean;
   doc: Document;
   selectedLayerId: LayerId | null;
   activeTool: ToolId;
@@ -66,6 +69,8 @@ const initialHistory = new History(initialDoc);
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   history: initialHistory,
+  canUndo: false,
+  canRedo: false,
   doc: initialDoc,
   selectedLayerId: null,
   activeTool: 'move',
@@ -80,21 +85,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   applyDoc: (next) => {
     get().history.reset(next);
-    set({ doc: next });
+    set({ doc: next, canUndo: get().history.canUndo(), canRedo: get().history.canRedo() });
   },
 
   commit: (label, recipe) => {
     const next = get().history.commit(label, recipe);
-    set({ doc: next });
+    set({ doc: next, canUndo: get().history.canUndo(), canRedo: get().history.canRedo() });
   },
 
   undo: () => {
     const next = get().history.undo();
-    set({ doc: next });
+    set({ doc: next, canUndo: get().history.canUndo(), canRedo: get().history.canRedo() });
   },
   redo: () => {
     const next = get().history.redo();
-    set({ doc: next });
+    set({ doc: next, canUndo: get().history.canUndo(), canRedo: get().history.canRedo() });
   },
 
   addImage: (input) =>
@@ -172,6 +177,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().history.reset(fresh);
     set({
       doc: fresh,
+      canUndo: false,
+      canRedo: false,
       selectedLayerId: null,
       activeTool: 'move',
       zoom: 1,
