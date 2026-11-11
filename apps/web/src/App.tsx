@@ -19,6 +19,10 @@ export function App(): React.JSX.Element {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [mobilePanelsOpen, setMobilePanelsOpen] = useState(false);
   const tool = useEditorStore((s) => s.activeTool);
+  const canUndo = useEditorStore((s) => s.canUndo);
+  const canRedo = useEditorStore((s) => s.canRedo);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
 
   useKeyboardShortcuts();
 
@@ -108,6 +112,10 @@ export function App(): React.JSX.Element {
       </div>
       <button type="button" onClick={() => setMobilePanelsOpen((open) => !open)} className="fixed right-2 top-14 z-30 rounded-full border border-ink-600 bg-ink-900/95 px-3 py-2 text-xs font-semibold text-zinc-100 shadow-lg sm:hidden">{mobilePanelsOpen ? "Close panels" : "Layers & tools"}</button>
       <StatusBar />
+      <div className="fixed bottom-10 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ink-600 bg-ink-900/95 p-1.5 shadow-xl sm:hidden">
+        <button type="button" onClick={undo} disabled={!canUndo} aria-label="Undo" className="rounded-full px-4 py-2 text-sm font-semibold text-zinc-100 disabled:cursor-not-allowed disabled:opacity-35">↶ Undo</button>
+        <button type="button" onClick={redo} disabled={!canRedo} aria-label="Redo" className="rounded-full px-4 py-2 text-sm font-semibold text-zinc-100 disabled:cursor-not-allowed disabled:opacity-35">↷ Redo</button>
+      </div>
       <button className="fixed bottom-8 left-4 z-30 max-sm:hidden rounded-full border border-emerald-900 bg-ink-900 px-4 py-2 text-xs font-semibold text-emerald-200 shadow-lg" onClick={() => setDiagnosticsOpen(true)}>Ω System Check</button>
       <SystemDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
       <button
