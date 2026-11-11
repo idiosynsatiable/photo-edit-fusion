@@ -26,6 +26,26 @@ describe('editor store', () => {
     expect(useEditorStore.getState().doc.layerOrder.length).toBe(0);
   });
 
+  it('publishes reactive undo and redo availability', () => {
+    const store = useEditorStore.getState();
+    expect(store.canUndo).toBe(false);
+    expect(store.canRedo).toBe(false);
+
+    store.addText('History test');
+    expect(useEditorStore.getState().canUndo).toBe(true);
+    expect(useEditorStore.getState().canRedo).toBe(false);
+
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().doc.layerOrder.length).toBe(0);
+    expect(useEditorStore.getState().canUndo).toBe(false);
+    expect(useEditorStore.getState().canRedo).toBe(true);
+
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState().doc.layerOrder.length).toBe(1);
+    expect(useEditorStore.getState().canUndo).toBe(true);
+    expect(useEditorStore.getState().canRedo).toBe(false);
+  });
+
   it('changes blend mode', () => {
     useEditorStore.getState().addText('Hi');
     const id = useEditorStore.getState().doc.layerOrder[0]!;
