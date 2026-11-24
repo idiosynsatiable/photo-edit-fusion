@@ -8,26 +8,26 @@ test('app loads and shows toolbar', async ({ page }) => {
   console.log('E2E_BODY_TEXT:', await page.locator('body').innerText());
   console.log('E2E_ROOT_HTML:', (await page.locator('#root').innerHTML()).slice(0, 3000));
   await expect(page.getByText('Photo Edit Fusion')).toBeVisible();
-  await expect(page.getByText('Open Image')).toBeVisible();
-  await expect(page.getByText('Text + Font Ω')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open Image', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Font Extract (F)', exact: true })).toBeVisible();
   await expect(page.getByText('Take Photo')).toBeVisible();
 });
 
 test('layers panel is empty on a fresh document', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('Layers')).toBeVisible();
-  await expect(page.getByText(/get started/)).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Layers', exact: true })).toBeVisible();
+  await expect(page.getByText('Get started', { exact: true })).toBeVisible();
 });
 
 test('text tool adds a layer', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Text (T)').click();
-  await expect(page.getByText(/Text — /)).toBeVisible();
+  await expect(page.getByLabel('Text', { exact: true })).toHaveValue('Your text');
 });
 
 test('opening font extract modal is reachable', async ({ page }) => {
   await page.goto('/');
-  await page.getByText('Text + Font Ω').click();
+  await page.getByRole('button', { name: 'Font Extract (F)', exact: true }).click();
   await expect(page.getByText('Ω Text & Font Extraction')).toBeVisible();
 });
 
@@ -65,9 +65,11 @@ test('AI Studio requires explicit Gemini consent before sending an image', async
 test('shape tools add editable rectangle and ellipse layers', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Add rectangle shape').click();
-  await expect(page.getByText('rectangle', { exact: false })).toBeVisible();
+  await expect(page.getByLabel('Shape', { exact: true })).toHaveValue('rectangle');
+  await page.getByRole('tab', { name: 'Layers', exact: true }).click();
   await page.getByLabel('Add ellipse shape').click();
-  await expect(page.getByText('ellipse', { exact: false })).toBeVisible();
+  await page.getByRole('tab', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel('Shape', { exact: true })).toHaveValue('ellipse');
 });
 
 test('camera capture control is present for Android photo import', async ({ page }) => {
@@ -108,7 +110,7 @@ test('local photo import creates a correctly sized editable image document', asy
     mimeType: 'image/png',
     buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/XioAAAAASUVORK5CYII=', 'base64'),
   });
-  await expect(page.getByText('sample-photo', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Project name')).toHaveValue('sample-photo');
   await expect(page.getByText('1 × 1', { exact: true })).toBeVisible();
-  await expect(page.getByText('image', { exact: true })).toBeVisible();
+  await expect(page.getByText('Image properties', { exact: true })).toBeVisible();
 });

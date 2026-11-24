@@ -1,23 +1,23 @@
-import { CANVAS2D_FALLBACK } from '@pef/shared';
+import { compositeCanvas2D } from '@pef/filters';
+import { CANVAS2D_FALLBACK, WEBGL_REQUIRED } from '@pef/shared';
 import type { Document, Layer, ImageLayer, ShapeLayer, TextLayer } from '@pef/shared';
 
 /**
  * Canvas2D-based renderer. Walks the layer order and draws each layer onto
  * the destination context, applying transform, blend mode, and opacity. The
  * native globalCompositeOperation path covers 16 of the 27 blend modes; the
- * remaining 11 currently render in normal mode (a future build can swap in
- * the WebGL compositor for pixel-perfect output of those modes — the GLSL
- * shaders in @pef/filters are ready).
+ * remaining modes use a CPU compositor at the same render scale.
  */
 export interface RenderOptions {
   doc: Document;
   ctx: CanvasRenderingContext2D;
-  bitmapCache: Map<string, HTMLImageElement>;
+  bitmapCache: Map<string, HTMLImageElement | HTMLCanvasElement>;
 }
 
 export function renderDocument(opts: RenderOptions): void {
   const { doc, ctx, bitmapCache } = opts;
   ctx.save();
+  ctx.clearRect(0, 0, doc.width, doc.height);
   // background
   const [br, bg, bb, ba] = doc.background;
   ctx.fillStyle = `rgba(${Math.round(br * 255)}, ${Math.round(bg * 255)}, ${Math.round(bb * 255)}, ${ba})`;
@@ -26,12 +26,16 @@ export function renderDocument(opts: RenderOptions): void {
   for (const id of doc.layerOrder) {
     const layer = doc.layers[id];
     if (!layer || !layer.visible) continue;
-    drawLayer(ctx, layer, bitmapCache);
+    if (WEBGL_REQUIRED.has(layer.blendMode)) {
+      const raster = document.createElement('canvas'); raster.width = ctx.canvas.width; raster.height = ctx.canvas.height;
+      const rctx = raster.getContext('2d');
+      if (rctx) { rctx.setTransform(ctx.getTransform()); drawLayer(rctx, { ...layer, blendMode: 'normal', opacity: 1 }, bitmapCache); compositeCanvas2D(ctx, raster, layer.blendMode, layer.opacity); }
+    } else drawLayer(ctx, layer, bitmapCache);
   }
   ctx.restore();
 }
 
-function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, bitmaps: Map<string, HTMLImageElement>): void {
+function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, bitmaps: Map<string, HTMLImageElement | HTMLCanvasElement>): void {
   ctx.save();
   ctx.globalAlpha = layer.opacity;
   ctx.globalCompositeOperation = CANVAS2D_FALLBACK[layer.blendMode];
@@ -60,7 +64,7 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, bitmaps: Map<str
   ctx.restore();
 }
 
-function drawImageLayer(ctx: CanvasRenderingContext2D, layer: ImageLayer, bitmaps: Map<string, HTMLImageElement>): void {
+function drawImageLayer(ctx: CanvasRenderingContext2D, layer: ImageLayer, bitmaps: Map<string, HTMLImageElement | HTMLCanvasElement>): void {
   const img = bitmaps.get(layer.bitmapId);
   if (!img) return;
   const w = layer.sourceWidth;
@@ -68,6 +72,8 @@ function drawImageLayer(ctx: CanvasRenderingContext2D, layer: ImageLayer, bitmap
   const x = -w * layer.transform.anchor.x;
   const y = -h * layer.transform.anchor.y;
   const mask = layer.maskBitmapId ? bitmaps.get(layer.maskBitmapId) : undefined;
+  const a = layer.adjustments;
+  if (a) ctx.filter = `brightness(${1 + a.brightness}) contrast(${1 + a.contrast}) saturate(${1 + a.saturation}) grayscale(${a.grayscale}) sepia(${a.sepia}) blur(${a.blur}px)`;
 
   if (!mask) {
     ctx.drawImage(img, x, y, w, h);
@@ -94,23 +100,19 @@ function drawImageLayer(ctx: CanvasRenderingContext2D, layer: ImageLayer, bitmap
 function drawTextLayer(ctx: CanvasRenderingContext2D, layer: TextLayer): void {
   const [r, g, b, a] = layer.color;
   ctx.fillStyle = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
-  ctx.font = `${layer.fontStyle} ${layer.fontWeight} ${layer.fontSizePx}px "${layer.fontFamily}"`;
-  ctx.textBaseline = 'alphabetic';
-  ctx.textAlign = layer.align === 'justify' ? 'left' : (layer.align as CanvasTextAlign);
-
-  // letterSpacing isn't universally supported — fall back to per-char layout.
+  ctx.font = `${layer.fontStyle} ${layer.fontWeight} ${layer.fontSizePx}px ${layer.fontFamily.includes(',') || layer.fontFamily.includes('"') ? layer.fontFamily : `"${layer.fontFamily}"`}`;
+  ctx.textBaseline = 'top';
   const lines = layer.text.split(/\n/);
-  let y = 0;
+  const w = Math.max(1, ...lines.map((l) => l.length)) * layer.fontSizePx * 0.55;
+  const h = lines.length * layer.fontSizePx * layer.lineHeight;
+  const ox = -w * layer.transform.anchor.x; let y = -h * layer.transform.anchor.y;
+  ctx.textAlign = 'left';
   for (const line of lines) {
-    if (layer.letterSpacingEm === 0) {
-      ctx.fillText(line, 0, y);
-    } else {
-      let x = 0;
-      for (const ch of line) {
-        ctx.fillText(ch, x, y);
-        x += ctx.measureText(ch).width + layer.letterSpacingEm * layer.fontSizePx;
-      }
-    }
+    const tracking = layer.letterSpacingEm * layer.fontSizePx;
+    const lineWidth = ctx.measureText(line).width + Math.max(0, line.length - 1) * tracking;
+    let x = ox + (layer.align === 'center' ? (w - lineWidth) / 2 : layer.align === 'right' ? w - lineWidth : 0);
+    if (!tracking) ctx.fillText(line, x, y);
+    else for (const ch of line) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + tracking; }
     y += layer.fontSizePx * layer.lineHeight;
   }
 }
@@ -167,10 +169,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 /** Build/refresh a bitmap cache from a Document's bitmap registry. */
-export async function loadBitmaps(doc: Document, cache: Map<string, HTMLImageElement>): Promise<void> {
+export async function loadBitmaps(doc: Document, cache: Map<string, HTMLImageElement | HTMLCanvasElement>): Promise<void> {
   const promises: Promise<void>[] = [];
+  for (const id of cache.keys()) if (!doc.bitmaps[id]) cache.delete(id);
   for (const [id, dataUrl] of Object.entries(doc.bitmaps)) {
-    if (cache.has(id)) continue;
+    const existing = cache.get(id);
+    if (existing instanceof HTMLImageElement && existing.src === dataUrl) continue;
     promises.push(
       new Promise((resolve) => {
         const img = new Image();

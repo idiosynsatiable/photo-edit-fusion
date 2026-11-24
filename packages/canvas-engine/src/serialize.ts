@@ -11,7 +11,14 @@ export function toProjectFile(doc: Document): string {
 export function fromProjectFile(json: string): Document {
   const raw: unknown = JSON.parse(json);
   const parsed = ProjectFileV1Schema.parse(raw);
-  return parsed.document;
+  const doc = parsed.document;
+  if (doc.width > 8192 || doc.height > 8192 || doc.width * doc.height > 16_000_000) throw new Error('This project exceeds the 16 megapixel editing limit.');
+  if (new Set(doc.layerOrder).size !== doc.layerOrder.length || doc.layerOrder.some((id) => !doc.layers[id] || doc.layers[id]!.id !== id)) throw new Error('The project has an invalid layer order.');
+  for (const layer of Object.values(doc.layers)) {
+    if (layer.transform.scale.x === 0 || layer.transform.scale.y === 0) throw new Error('A layer has an invalid scale.');
+    if (layer.type === 'image' && (!doc.bitmaps[layer.bitmapId] || layer.sourceWidth * layer.sourceHeight > 16_000_000)) throw new Error('A project image is missing or too large.');
+  }
+  return doc;
 }
 
 export function isProjectFile(json: string): boolean {

@@ -43,11 +43,22 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify editor
+        run: pnpm verify
+
       - name: Build web editor (offline-first)
         run: pnpm build
         env:
           # Blank by design: an Android APK must not depend on Railway being paid or online.
           VITE_API_BASE_URL: ''
+
+      - name: Install browser test runtime
+        run: pnpm exec playwright install chromium
+
+      - name: Verify editing and offline recovery
+        run: pnpm test:e2e && pnpm test:e2e:offline
+        env:
+          CI: 'true'
 
       - name: Generate Android project
         run: pnpm exec cap add android
@@ -61,6 +72,11 @@ jobs:
           test -s apps/web/dist/tesseract/lang/eng.traineddata
           test -s android/app/src/main/assets/public/tesseract/worker.min.js
           test -s android/app/src/main/assets/public/tesseract/lang/eng.traineddata
+
+      - name: Set preview version
+        run: |
+          sed -i 's/versionCode 1/versionCode ${{ github.run_number }}/' android/app/build.gradle
+          sed -i 's/versionName "1.0"/versionName "1.1.0-preview"/' android/app/build.gradle
 
       - name: Assemble debug APK
         working-directory: android
@@ -103,3 +119,26 @@ jobs:
             sleep 12
             adb shell pidof com.idiosynsatiable.photoeditfusion
 
+
+  publish-preview:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: android-apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: photo-edit-fusion-android-debug-apk
+          path: release
+      - name: Publish verified Android preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp release/app-debug.apk release/Photo-Edit-Fusion-1.1.0-preview.apk
+          cd release
+          sha256sum Photo-Edit-Fusion-1.1.0-preview.apk > SHA256SUMS.txt
+          cd ..
+          gh release create "editor-revamp-${{ github.run_number }}" release/Photo-Edit-Fusion-1.1.0-preview.apk release/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "Photo Edit Fusion 1.1.0 Preview" --notes "Revamped local photo editor with crop, resize, editable layers and masks, adjustments, text and shape styling, history, project recovery and PNG/JPEG/WebP export. Debug-signed Android preview; emulator install and launch checked. Physical Samsung, live Gemini/TITAN and advanced AI editing remain unverified."
+          gh release view "editor-revamp-${{ github.run_number }}" --json url --jq .url

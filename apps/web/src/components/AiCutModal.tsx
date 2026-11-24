@@ -17,7 +17,8 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
   const commit = useEditorStore((s) => s.commit);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [provider, setProvider] = useState<'auto' | 'local-onnx' | 'remove-bg'>('auto');
+  const [provider, setProvider] = useState<'auto' | 'local-onnx' | 'remove-bg'>('local-onnx');
+  const [consent, setConsent] = useState(false);
   const previewRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
   if (!open) return null;
 
   const layer = selectedLayerId ? doc.layers[selectedLayerId] : null;
-  const canRun = layer && layer.type === 'image';
+  const canRun = layer && layer.type === 'image' && !layer.locked;
 
   async function run(): Promise<void> {
     if (!canRun || !layer || layer.type !== 'image') return;
@@ -38,6 +39,8 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
     setError(null);
     try {
       const dataUrl = doc.bitmaps[layer.bitmapId] ?? '';
+      if (provider === 'local-onnx') { await runLocalApprox(dataUrl, layer.bitmapId); return; }
+      if (!consent) throw new Error('Consent is required before sending this image to Remove.bg.');
       const resp = (await postAiCut(dataUrl, provider === 'auto' ? undefined : provider)) as AiCutResponse;
 
       if ('error' in resp) {
@@ -56,8 +59,10 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
       }
       // remote success
       const cutout = (resp as AiCutResponseRemote).cutoutPngDataUrl;
-      commit('AI cut', (d) => {
-        d.bitmaps[layer.bitmapId] = cutout;
+      const outputId = crypto.randomUUID();
+      commit('Background removal', (d) => {
+        const target = d.layers[layer.id]; if (!target || target.type !== 'image') return;
+        d.bitmaps[outputId] = cutout; target.bitmapId = outputId;
       });
       const img = await loadImage(cutout);
       drawPreview(img);
@@ -110,8 +115,11 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
     }
     ctx.putImageData(data, 0, 0);
     const newDataUrl = c.toDataURL('image/png');
-    commit('AI cut (local approx)', (d) => {
-      d.bitmaps[bitmapId] = newDataUrl;
+    const maskId = crypto.randomUUID();
+    commit('Local background mask', (d) => {
+      const target = layer ? d.layers[layer.id] : null;
+      if (!target || target.type !== 'image' || target.bitmapId !== bitmapId) return;
+      d.bitmaps[maskId] = newDataUrl; target.maskBitmapId = maskId;
     });
     const out = await loadImage(newDataUrl);
     drawPreview(out);
@@ -130,10 +138,10 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-ink-900 border border-ink-700 rounded-lg w-[640px] max-w-[95vw] p-5" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Background removal" className="bg-ink-900 border border-ink-700 rounded-lg w-[640px] max-w-[95vw] p-5" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">AI Cut</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
+          <button aria-label="Close background removal" onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
         </header>
         {!canRun && <div className="text-sm text-zinc-400 mb-3">Select an image layer to remove its background.</div>}
         <p className="mb-3 text-xs text-amber-200/80">Offline Local mode uses a lightweight corner-color background remover, not semantic AI segmentation. It works without a server, but busy or multicolored backgrounds may need manual Lasso or Magic Wand cleanup.</p>
@@ -148,7 +156,8 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
             <input type="radio" checked={provider === 'remove-bg'} onChange={() => setProvider('remove-bg')} /> Remove.bg
           </label>
         </div>
-        <button onClick={run} disabled={!canRun || working} className="btn-accent">
+        {provider !== 'local-onnx' && <label className="check-field"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />I consent to sending this image to Remove.bg for background removal.</label>}
+        <button onClick={run} disabled={!canRun || working || (provider !== 'local-onnx' && !consent)} className="btn-accent">
           {working ? 'Cutting…' : 'Run AI Cut'}
         </button>
         {error && <div className="text-red-400 text-xs mt-2">{error}</div>}

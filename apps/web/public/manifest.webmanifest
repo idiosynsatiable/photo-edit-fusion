@@ -4,8 +4,8 @@
   "description": "All-in-one photo editor with overlay, blend, cut, and font extraction.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0a0a0c",
-  "theme_color": "#0a0a0c",
+  "background_color": "#121416",
+  "theme_color": "#121416",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
   ]

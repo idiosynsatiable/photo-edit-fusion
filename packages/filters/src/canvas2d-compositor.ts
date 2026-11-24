@@ -49,7 +49,8 @@ export function compositeCanvas2D(
       (srcImg.data[i + 2] ?? 0) / 255,
       (srcImg.data[i + 3] ?? 0) / 255,
     ];
-    const r = blendPixel(mode, b, s, opacity);
+    if (mode === 'dissolve') { const hash = Math.imul((i / 4 + 1) ^ 0x45d9f3b, 0x45d9f3b) >>> 0; s[3] = hash / 0xffffffff < s[3] * opacity ? 1 : 0; }
+    const r = blendPixel(mode, b, s, mode === 'dissolve' ? 1 : opacity);
     out.data[i] = Math.round(r[0] * 255);
     out.data[i + 1] = Math.round(r[1] * 255);
     out.data[i + 2] = Math.round(r[2] * 255);

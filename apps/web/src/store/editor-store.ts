@@ -21,7 +21,10 @@ export type ToolId =
   | 'magic-wand'
   | 'ai-cut'
   | 'text'
-  | 'font-extract';
+  | 'font-extract'
+  | 'crop'
+  | 'adjust'
+  | 'eraser';
 
 interface EditorState {
   history: History;
@@ -29,6 +32,23 @@ interface EditorState {
   selectedLayerId: LayerId | null;
   activeTool: ToolId;
   zoom: number;
+  fitRequest: number;
+  brushSize: number;
+  wandTolerance: number;
+  saveStatus: 'saving' | 'saved' | 'unavailable';
+  gestureStart: Document | null;
+  notice: string | null;
+  setNotice: (message: string | null) => void;
+  setSaveStatus: (status: 'saving' | 'saved' | 'unavailable') => void;
+  fitCanvas: () => void;
+  setBrushSize: (size: number) => void;
+  setWandTolerance: (size: number) => void;
+  beginGesture: () => void;
+  previewLayer: (id: LayerId, patch: Partial<Layer>) => void;
+  endGesture: (label: string) => void;
+  cancelGesture: () => void;
+  resizeCanvas: (width: number, height: number, scaleContent?: boolean) => void;
+  cropCanvas: (x: number, y: number, width: number, height: number) => void;
   // selection mask in document space (RGBA imageData-like array, 0..255)
   selectionMaskBase64: string | null;
   // last font match result for the modal
@@ -62,6 +82,7 @@ interface EditorState {
 }
 
 const initialDoc = createDocument({ name: 'Untitled', width: 1600, height: 1000 });
+initialDoc.background = [0, 0, 0, 0];
 const initialHistory = new History(initialDoc);
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -70,50 +91,107 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedLayerId: null,
   activeTool: 'move',
   zoom: 1,
+  fitRequest: 0,
+  brushSize: 40,
+  wandTolerance: 24,
+  saveStatus: 'saving',
+  gestureStart: null,
+  notice: null,
+  setNotice: (notice) => set({ notice }),
+  setSaveStatus: (saveStatus) => set({ saveStatus }),
+  fitCanvas: () => set((s) => ({ fitRequest: s.fitRequest + 1 })),
+  setBrushSize: (brushSize) => set({ brushSize }),
+  setWandTolerance: (wandTolerance) => set({ wandTolerance }),
+  beginGesture: () => set({ gestureStart: get().doc }),
+  previewLayer: (id, patch) => {
+    const s = get(), layer = s.doc.layers[id];
+    if (!layer || layer.locked) return;
+    set({ doc: { ...s.doc, layers: { ...s.doc.layers, [id]: { ...layer, ...patch } as Layer } } });
+  },
+  endGesture: (label) => {
+    const s = get(); if (!s.gestureStart) return;
+    const next = s.doc; set({ doc: s.gestureStart, gestureStart: null });
+    if (next !== s.gestureStart) get().commit(label, (d) => assignDoc(d, next));
+  },
+  cancelGesture: () => {
+    if (get().gestureStart) set({ doc: get().gestureStart!, gestureStart: null });
+  },
+  resizeCanvas: (width, height, scaleContent = false) => {
+    if (!validSize(width, height)) { get().setNotice('Use dimensions from 1–8192 px, up to 16 megapixels.'); return; }
+    get().commit('Resize canvas', (d) => {
+      if (scaleContent) for (const layer of Object.values(d.layers)) {
+        layer.transform.position.x *= width / d.width; layer.transform.position.y *= height / d.height;
+        layer.transform.scale.x *= width / d.width; layer.transform.scale.y *= height / d.height;
+      }
+      d.width = width; d.height = height;
+    });
+    get().fitCanvas();
+  },
+  cropCanvas: (x, y, width, height) => {
+    if (!validSize(width, height)) return;
+    get().commit('Crop canvas', (d) => {
+      for (const layer of Object.values(d.layers)) {
+        layer.transform.position.x -= x; layer.transform.position.y -= y;
+      }
+      d.width = width; d.height = height;
+    });
+    get().setActiveTool('move'); get().fitCanvas();
+  },
   selectionMaskBase64: null,
   lastFontMatchProvider: null,
   lastFontMatches: [],
 
   setActiveTool: (t) => set({ activeTool: t }),
-  setZoom: (z) => set({ zoom: Math.max(0.05, Math.min(16, z)) }),
+  setZoom: (z) => { if (Number.isFinite(z)) set({ zoom: Math.max(0.01, Math.min(16, z)) }); },
   selectLayer: (id) => set({ selectedLayerId: id }),
 
   applyDoc: (next) => {
     get().history.reset(next);
-    set({ doc: next });
+    set({ doc: next, selectedLayerId: null, selectionMaskBase64: null, gestureStart: null, fitRequest: get().fitRequest + 1 });
   },
 
   commit: (label, recipe) => {
-    const next = get().history.commit(label, recipe);
-    set({ doc: next });
+    const history = get().gestureStart ? new History(get().doc) : get().history;
+    const next = history.commit(label, (d) => { recipe(d); d.meta = { ...d.meta, modifiedAt: new Date().toISOString() }; });
+    const selected = get().selectedLayerId;
+    set({ doc: next, selectedLayerId: selected && next.layers[selected] ? selected : null });
   },
 
   undo: () => {
     const next = get().history.undo();
-    set({ doc: next });
+    set({ doc: next, selectedLayerId: get().selectedLayerId && next.layers[get().selectedLayerId!] ? get().selectedLayerId : null });
   },
   redo: () => {
     const next = get().history.redo();
-    set({ doc: next });
+    set({ doc: next, selectedLayerId: get().selectedLayerId && next.layers[get().selectedLayerId!] ? get().selectedLayerId : null });
   },
 
-  addImage: (input) =>
+  addImage: (input) => {
     get().commit('Add image', (d) => {
       const next = addImageLayer(d, input);
       assignDoc(d, next);
-    }),
+      const layer = d.layers[d.layerOrder[d.layerOrder.length - 1]!]!;
+      const scale = Math.min(1, d.width / input.sourceWidth, d.height / input.sourceHeight);
+      layer.transform.scale = { x: scale, y: scale };
+    });
+    set({ selectedLayerId: get().doc.layerOrder.at(-1)! });
+  },
 
-  addText: (text, opts) =>
+  addText: (text, opts) => {
     get().commit('Add text', (d) => {
       const next = addTextLayer(d, { text, ...opts });
       assignDoc(d, next);
-    }),
+    });
+    set({ selectedLayerId: get().doc.layerOrder.at(-1)! });
+  },
 
-  addShape: (shape) =>
+  addShape: (shape) => {
     get().commit('Add shape', (d) => {
       const next = addShapeLayer(d, { shape, width: 200, height: 200 });
       assignDoc(d, next);
-    }),
+    });
+    set({ selectedLayerId: get().doc.layerOrder.at(-1)! });
+  },
 
   removeLayer: (id) =>
     get().commit('Delete layer', (d) => {
@@ -121,11 +199,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       assignDoc(d, next);
     }),
 
-  duplicate: (id) =>
+  duplicate: (id) => {
     get().commit('Duplicate layer', (d) => {
       const next = duplicateLayer(d, id);
       assignDoc(d, next);
-    }),
+    });
+    const order = get().doc.layerOrder;
+    set({ selectedLayerId: order[order.indexOf(id) + 1]! });
+  },
 
   reorder: (id, idx) =>
     get().commit('Reorder layer', (d) => {
@@ -169,12 +250,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   reset: () => {
     const fresh = createDocument({ name: 'Untitled', width: 1600, height: 1000 });
+    fresh.background = [0, 0, 0, 0];
     get().history.reset(fresh);
     set({
       doc: fresh,
       selectedLayerId: null,
       activeTool: 'move',
       zoom: 1,
+      gestureStart: null,
+      fitRequest: get().fitRequest + 1,
       selectionMaskBase64: null,
       lastFontMatchProvider: null,
       lastFontMatches: [],
@@ -199,3 +283,5 @@ function assignDoc(target: Document, source: Document): void {
   target.background = source.background;
   target.meta = source.meta;
 }
+
+export function validSize(w: number, h: number): boolean { return Number.isInteger(w) && Number.isInteger(h) && w > 0 && h > 0 && w <= 8192 && h <= 8192 && w * h <= 16_000_000; }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Toolbar } from './components/Toolbar.js';
 import { ToolsRail } from './components/ToolsRail.js';
-import { LayersPanel } from './components/LayersPanel.js';
+import { LayersPanel, HistoryPanel } from './components/LayersPanel.js';
 import { PropertiesPanel } from './components/PropertiesPanel.js';
 import { CanvasStage } from './components/CanvasStage.js';
 import { StatusBar } from './components/StatusBar.js';
@@ -9,119 +9,38 @@ import { FontExtractModal } from './components/FontExtractModal.js';
 import { AiCutModal } from './components/AiCutModal.js';
 import { AiEditAssistant } from './components/AiEditAssistant.js';
 import { SystemDiagnostics } from './components/SystemDiagnostics.js';
+import { Icon } from './components/Icon.js';
 import { useEditorStore } from './store/editor-store.js';
 import { useKeyboardShortcuts } from './hooks/use-keyboard-shortcuts.js';
-
+import { useAutosave } from './hooks/use-autosave.js';
+import { importImages } from './lib/editor-files.js';
 export function App(): React.JSX.Element {
-  const [fontModalOpen, setFontModalOpen] = useState(false);
-  const [aiCutModalOpen, setAiCutModalOpen] = useState(false);
-  const [aiStudioOpen, setAiStudioOpen] = useState(false);
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
-  const tool = useEditorStore((s) => s.activeTool);
-
-  useKeyboardShortcuts();
-
-  // Keep the working document on-device. This uses IndexedDB, not Railway,
-  // so a closed tab or interrupted session does not erase the current project.
+  const [fontModalOpen, setFontModalOpen] = useState(false), [aiCutModalOpen, setAiCutModalOpen] = useState(false), [aiStudioOpen, setAiStudioOpen] = useState(false), [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [tab, setTab] = useState<'edit' | 'layers' | 'history'>('edit'), [inspectorOpen, setInspectorOpen] = useState(false);
+  const tool = useEditorStore((s) => s.activeTool), notice = useEditorStore((s) => s.notice);
+  useKeyboardShortcuts(); useAutosave();
   useEffect(() => {
-    if (!('indexedDB' in window)) return;
-    let disposed = false;
-    let db: IDBDatabase | null = null;
-    let saveTimer: ReturnType<typeof setTimeout> | undefined;
-    let unsubscribe: (() => void) | undefined;
-    let persistNow: (() => void) | undefined;
-    let visibilityHandler: (() => void) | undefined;
-    const request = window.indexedDB.open('photo-edit-fusion-local', 1);
-
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains('documents')) database.createObjectStore('documents');
-    };
-
-    request.onsuccess = () => {
-      db = request.result;
-      const read = db.transaction('documents', 'readonly').objectStore('documents').get('autosave');
-      read.onsuccess = () => {
-        if (disposed) return;
-        const current = useEditorStore.getState().doc;
-        const shouldRestoreSavedDocument = Boolean(read.result) && current.layerOrder.length === 0 && current.name === 'Untitled';
-        if (shouldRestoreSavedDocument) useEditorStore.getState().applyDoc(read.result);
-        persistNow = () => {
-          if (!db || disposed) return;
-          if (saveTimer) clearTimeout(saveTimer);
-          try {
-            db.transaction('documents', 'readwrite').objectStore('documents').put(useEditorStore.getState().doc, 'autosave');
-          } catch {
-            // Manual Save Project export remains available if device storage is full.
-          }
-        };
-        visibilityHandler = () => {
-          if (document.visibilityState === 'hidden') persistNow?.();
-        };
-        window.addEventListener('pagehide', persistNow);
-        document.addEventListener('visibilitychange', visibilityHandler);
-        unsubscribe = useEditorStore.subscribe((state, previous) => {
-          if (state.doc === previous.doc || !db) return;
-          if (saveTimer) clearTimeout(saveTimer);
-          const nextDocument = state.doc;
-          saveTimer = setTimeout(() => {
-            if (!db || disposed) return;
-            try {
-              db.transaction('documents', 'readwrite').objectStore('documents').put(nextDocument, 'autosave');
-            } catch {
-              // Manual Save Project export remains available if device storage is full.
-            }
-          }, 500);
-        });
-        // If the user edited before IndexedDB finished opening, keep and persist
-        // that live document instead of losing it or restoring over it.
-        if (!shouldRestoreSavedDocument) persistNow();
-      };
-    };
-
-    return () => {
-      disposed = true;
-      if (saveTimer) clearTimeout(saveTimer);
-      unsubscribe?.();
-      if (persistNow) window.removeEventListener('pagehide', persistNow);
-      if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
-      db?.close();
-    };
+    const paste = (e: ClipboardEvent) => { const target = e.target as HTMLElement; if (['INPUT', 'TEXTAREA'].includes(target?.tagName) || target?.isContentEditable) return; const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/')); if (files.length) { e.preventDefault(); void importImages(files); } };
+    window.addEventListener('paste', paste); return () => window.removeEventListener('paste', paste);
   }, []);
-
-  useEffect(() => {
-    if (tool === 'font-extract') setFontModalOpen(true);
-    if (tool === 'ai-cut') setAiCutModalOpen(true);
-  }, [tool]);
-
-  return (
-    <div className="h-screen min-h-0 flex flex-col overflow-hidden bg-ink-950 text-zinc-100">
-      <Toolbar onOpenFontModal={() => setFontModalOpen(true)} onOpenAiCutModal={() => setAiCutModalOpen(true)} />
-      <div className="min-h-0 flex-1 flex overflow-hidden">
-        <ToolsRail />
-        <CanvasStage />
-        <div className="w-72 max-sm:w-40 shrink-0 border-l border-ink-700 flex flex-col">
-          <LayersPanel />
-          <PropertiesPanel />
-        </div>
-      </div>
-      <StatusBar />
-      <button className="fixed bottom-8 left-4 z-30 rounded-full border border-emerald-900 bg-ink-900 px-4 py-2 text-xs font-semibold text-emerald-200 shadow-lg" onClick={() => setDiagnosticsOpen(true)}>Ω System Check</button>
-      <SystemDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
-      <button
-        className="fixed bottom-8 right-4 z-30 rounded-full border border-cyan-800 bg-ink-900 px-4 py-2 text-xs font-semibold text-cyan-200 shadow-lg"
-        onClick={() => setAiStudioOpen((open) => !open)}
-        aria-expanded={aiStudioOpen}
-      >
-        {aiStudioOpen ? 'Close AI Studio' : 'Open AI Studio Ω'}
-      </button>
-      {aiStudioOpen && (
-        <div className="fixed bottom-16 right-4 z-20 max-h-[70vh] w-[min(92vw,420px)] overflow-y-auto rounded-lg border border-ink-600 shadow-2xl">
-          <AiEditAssistant />
-        </div>
-      )}
-      <FontExtractModal open={fontModalOpen} onClose={() => setFontModalOpen(false)} />
-      <AiCutModal open={aiCutModalOpen} onClose={() => setAiCutModalOpen(false)} />
+  useEffect(() => { if (!notice) return; const timer = setTimeout(() => useEditorStore.getState().setNotice(null), 9000); return () => clearTimeout(timer); }, [notice]);
+  useEffect(() => { if (tool === 'font-extract') setFontModalOpen(true); if (tool === 'ai-cut') setAiCutModalOpen(true); }, [tool]);
+  return <div className="editor-app">
+    <Toolbar />
+    <div className="editor-body">
+      <ToolsRail onEdit={(open = true) => { setTab('edit'); setInspectorOpen(open); }} />
+      <CanvasStage />
+      <aside className={`inspector ${inspectorOpen ? 'inspector-open' : ''}`}>
+        <div className="inspector-tabs" role="tablist" aria-label="Inspector panels">{(['edit', 'layers', 'history'] as const).map((name) => <button key={name} role="tab" aria-selected={tab === name} onClick={() => { setTab(name); setInspectorOpen(true); }}>{name[0]!.toUpperCase() + name.slice(1)}</button>)}<button className="collapse-inspector" aria-label={inspectorOpen ? 'Collapse inspector' : 'Expand inspector'} onClick={() => setInspectorOpen((open) => !open)}><Icon name={inspectorOpen ? 'down' : 'up'} /></button></div>
+        <div className="inspector-scroll" role="tabpanel">{tab === 'edit' ? <PropertiesPanel onCut={() => setAiCutModalOpen(true)} /> : tab === 'layers' ? <LayersPanel /> : <HistoryPanel />}</div>
+        <div className="inspector-utilities"><button aria-label="Open AI Studio Ω" onClick={() => setAiStudioOpen(true)}><Icon name="spark" />AI Studio</button><button aria-label="Ω System Check" onClick={() => setDiagnosticsOpen(true)}><Icon name="check" />System Check</button></div>
+      </aside>
     </div>
-  );
+    <StatusBar />
+    {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={() => useEditorStore.getState().setNotice(null)}><Icon name="close" /></button></div>}
+    <SystemDiagnostics open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
+    {aiStudioOpen && <div className="modal-backdrop" onClick={() => setAiStudioOpen(false)}><section className="editor-modal ai-modal" role="dialog" aria-modal="true" aria-label="AI Studio" onClick={(e) => e.stopPropagation()}><header><h2>AI Studio</h2><button aria-label="Close AI Studio" onClick={() => setAiStudioOpen(false)}><Icon name="close" /></button></header><AiEditAssistant /></section></div>}
+    <FontExtractModal open={fontModalOpen} onClose={() => { setFontModalOpen(false); useEditorStore.getState().setActiveTool('move'); }} />
+    <AiCutModal open={aiCutModalOpen} onClose={() => { setAiCutModalOpen(false); useEditorStore.getState().setActiveTool('move'); }} />
+  </div>;
 }
