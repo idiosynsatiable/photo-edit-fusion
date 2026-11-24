@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createWorker } from 'tesseract.js';
-import { postFontIdentify } from '../lib/api.js';
+import { loadBitmaps, renderDocument } from '../lib/render.js';
 import { useEditorStore } from '../store/editor-store.js';
 import { loadGoogleFontByUrl } from '../lib/font-loader.js';
 import type { FontMatch } from '@pef/shared';
@@ -24,18 +24,16 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
 
   useEffect(() => {
     if (!open) return;
-    const src = document.querySelector<HTMLCanvasElement>('#pef-export-canvas');
-    const dst = sourceCanvasRef.current;
-    if (!src || !dst) return;
-    const maxW = 720;
-    const ratio = Math.min(1, maxW / src.width);
-    dst.width = Math.max(1, Math.round(src.width * ratio));
-    dst.height = Math.max(1, Math.round(src.height * ratio));
-    const ctx = dst.getContext('2d');
-    if (ctx) ctx.drawImage(src, 0, 0, dst.width, dst.height);
+    let cancelled = false;
+    const doc = useEditorStore.getState().doc, dst = sourceCanvasRef.current;
+    if (!dst) return;
+    const ratio = Math.min(1, 720 / doc.width);
+    dst.width = Math.max(1, Math.round(doc.width * ratio)); dst.height = Math.max(1, Math.round(doc.height * ratio));
+    void (async () => { const cache = new Map<string, HTMLImageElement>(); await loadBitmaps(doc, cache); if (cancelled) return; const ctx = dst.getContext('2d'); if (ctx) { ctx.scale(ratio, ratio); renderDocument({ doc, ctx, bitmapCache: cache }); } })();
     setCrop(null);
     setExtractedText('');
     setError(null);
+    return () => { cancelled = true; };
   }, [open]);
 
   function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
@@ -149,16 +147,6 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
         maxResults: 10,
       });
       useEditorStore.getState().setFontMatches(local.provider, local.matches);
-      if (navigator.onLine) {
-        try {
-          const remote = await postFontIdentify(canvas.toDataURL('image/png'));
-          if (!('error' in remote) && remote.matches.length) {
-            useEditorStore.getState().setFontMatches(remote.provider, remote.matches);
-          }
-        } catch {
-          // Local ranked matches remain available when the optional API is offline.
-        }
-      }
       if (!local.matches.length) setError('No close font candidates were found. Try a larger, higher-contrast crop.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Font identification failed.');
@@ -197,7 +185,7 @@ export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | 
   if (!open) return null;
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2" onClick={onClose}>
-      <div className="bg-ink-900 border border-ink-700 rounded-lg w-[1024px] max-w-[95vw] max-h-[92vh] overflow-y-auto p-5 scrollbar-thin" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Text and font extraction" className="bg-ink-900 border border-ink-700 rounded-lg w-[1024px] max-w-[95vw] max-h-[92vh] overflow-y-auto p-5 scrollbar-thin" onClick={(e) => e.stopPropagation()}>
         <header className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Ω Text & Font Extraction</h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>

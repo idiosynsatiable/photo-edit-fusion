@@ -9,7 +9,7 @@ interface AABB {
   maxY: number;
 }
 
-function layerLocalSize(l: Layer): { w: number; h: number } {
+export function layerLocalSize(l: Layer): { w: number; h: number } {
   switch (l.type) {
     case 'image':
       return { w: l.sourceWidth, h: l.sourceHeight };
@@ -17,7 +17,7 @@ function layerLocalSize(l: Layer): { w: number; h: number } {
       return { w: l.width, h: l.height };
     case 'text':
       // approximate text bounds; precise bounds are computed at render time
-      return { w: l.text.length * l.fontSizePx * 0.55, h: l.fontSizePx * l.lineHeight };
+      return { w: Math.max(1, ...l.text.split('\n').map((line) => line.length)) * l.fontSizePx * 0.55, h: l.text.split('\n').length * l.fontSizePx * l.lineHeight };
     case 'group':
       return { w: 0, h: 0 };
   }

@@ -51,11 +51,13 @@ function setSat(c: RGB, s: number): RGB {
 export function blendPixel(mode: BlendMode, b: RGBA, s: RGBA, opacity: number): RGBA {
   const sa = s[3] * opacity;
   const blended = blendRGB(mode, [b[0], b[1], b[2]], [s[0], s[1], s[2]]);
+  const ba = b[3], alpha = sa + ba * (1 - sa);
+  if (alpha === 0) return [0, 0, 0, 0];
   return [
-    b[0] * (1 - sa) + blended[0] * sa,
-    b[1] * (1 - sa) + blended[1] * sa,
-    b[2] * (1 - sa) + blended[2] * sa,
-    Math.max(b[3], sa),
+    ((1 - sa) * ba * b[0] + (1 - ba) * sa * s[0] + ba * sa * blended[0]) / alpha,
+    ((1 - sa) * ba * b[1] + (1 - ba) * sa * s[1] + ba * sa * blended[1]) / alpha,
+    ((1 - sa) * ba * b[2] + (1 - ba) * sa * s[2] + ba * sa * blended[2]) / alpha,
+    alpha,
   ];
 }
 

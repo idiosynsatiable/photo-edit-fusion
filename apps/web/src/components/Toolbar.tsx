@@ -1,117 +1,39 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useEditorStore } from '../store/editor-store.js';
 import { createDocument, fromProjectFile, toProjectFile } from '@pef/canvas-engine';
-import { downloadBlob, loadImage, readFileAsDataUrl } from '../lib/file-utils.js';
+import { downloadBlob } from '../lib/file-utils.js';
+import { importImages } from '../lib/editor-files.js';
+import { ExportModal } from './ExportModal.js';
+import { Icon } from './Icon.js';
 
-interface Props { onOpenFontModal: () => void; onOpenAiCutModal: () => void }
-
-export function Toolbar({ onOpenFontModal, onOpenAiCutModal }: Props): React.JSX.Element {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const projectRef = useRef<HTMLInputElement>(null);
-  const addImage = useEditorStore((s) => s.addImage);
-  const applyDoc = useEditorStore((s) => s.applyDoc);
-  const doc = useEditorStore((s) => s.doc);
-  const undo = useEditorStore((s) => s.undo);
-  const redo = useEditorStore((s) => s.redo);
-  const history = useEditorStore((s) => s.history);
-
-  async function loadPhoto(file: File): Promise<void> {
-    const dataUrl = await readFileAsDataUrl(file);
-    const img = await loadImage(dataUrl);
-    const nextDocument = createDocument({
-      name: file.name.replace(/\.[^.]+$/, '') || 'Untitled',
-      width: img.naturalWidth,
-      height: img.naturalHeight,
-    });
-    nextDocument.background = [0, 0, 0, 0];
-    applyDoc(nextDocument);
-    addImage({
-      bitmapId: `b_${Date.now()}`,
-      bitmapDataUrl: dataUrl,
-      sourceWidth: img.naturalWidth,
-      sourceHeight: img.naturalHeight,
-      name: file.name,
-    });
+export function Toolbar(): React.JSX.Element {
+  const imageRef = useRef<HTMLInputElement>(null), addRef = useRef<HTMLInputElement>(null), cameraRef = useRef<HTMLInputElement>(null), projectRef = useRef<HTMLInputElement>(null);
+  const s = useEditorStore();
+  const [exportOpen, setExportOpen] = useState(false);
+  function canReplace(): boolean { return !s.doc.layerOrder.length || window.confirm('Start a new project? Save Project first to keep a separate editable copy. Your current autosave will be replaced.'); }
+  async function pick(e: React.ChangeEvent<HTMLInputElement>, replace: boolean): Promise<void> {
+    const files = [...(e.target.files ?? [])]; e.target.value = ''; if (!files.length || (replace && !canReplace())) return; await importImages(files, replace);
   }
-
-  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try { await loadPhoto(file); } catch (error) { window.alert(error instanceof Error ? error.message : 'Could not open image.'); }
-    if (fileRef.current) fileRef.current.value = '';
+  async function openProject(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = e.target.files?.[0]; e.target.value = ''; if (!file || !canReplace()) return;
+    try { if (file.size > 100 * 1024 * 1024) throw new Error('Project files must be smaller than 100 MB.'); s.applyDoc(fromProjectFile(await file.text())); }
+    catch { s.setNotice('Could not open this project. Choose a valid .pef.json file saved by Photo Edit Fusion.'); }
   }
-
-  async function onCapturePhoto(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try { await loadPhoto(file); } catch (error) { window.alert(error instanceof Error ? error.message : 'Could not open captured photo.'); }
-    if (cameraRef.current) cameraRef.current.value = '';
-  }
-
-  async function onPickProject(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    const next = fromProjectFile(text);
-    applyDoc(next);
-    if (projectRef.current) projectRef.current.value = '';
-  }
-
-  function createBlankCanvas(): void {
-    const nextDocument = createDocument({ name: 'Untitled', width: 1920, height: 1080 });
-    nextDocument.background = [0, 0, 0, 0];
-    applyDoc(nextDocument);
-  }
-
-  function exportProject(): void {
-    const json = toProjectFile(doc);
-    void downloadBlob(new Blob([json], { type: 'application/json' }), `${doc.name}.pef.json`).catch((error: unknown) => {
-      window.alert(error instanceof Error ? error.message : 'Project export failed.');
-    });
-  }
-
-  function exportPng(): void {
-    const canvas = document.getElementById('pef-export-canvas') as HTMLCanvasElement | null;
-    if (!canvas) return;
-    canvas.toBlob((blob) => {
-      if (blob) void downloadBlob(blob, `${doc.name}.png`).catch((error: unknown) => {
-        window.alert(error instanceof Error ? error.message : 'PNG export failed.');
-      });
-    }, 'image/png');
-  }
-
-  return (
-    <header className="h-12 min-h-12 shrink-0 border-b border-ink-700 bg-ink-900 flex flex-nowrap items-center overflow-x-auto px-3 gap-2 select-none">
-      <div className="shrink-0 font-semibold tracking-wide text-zinc-200">Photo Edit Fusion Ω</div>
-      <div className="w-px h-6 bg-ink-700 mx-1 shrink-0" />
-      <button onClick={createBlankCanvas} className="btn shrink-0">New Canvas</button>
-      <button onClick={() => fileRef.current?.click()} className="btn shrink-0">Open Image</button>
-      <button onClick={() => cameraRef.current?.click()} className="btn-camera shrink-0">Take Photo</button>
-      <button onClick={() => projectRef.current?.click()} className="btn shrink-0">Open Project</button>
-      <button onClick={exportProject} className="btn shrink-0">Save Project</button>
-      <button onClick={exportPng} className="btn shrink-0">Export PNG</button>
-      <div className="w-px h-6 bg-ink-700 mx-1 shrink-0" />
-      <button onClick={undo} disabled={!history.canUndo()} className="btn-ghost shrink-0">Undo</button>
-      <button onClick={redo} disabled={!history.canRedo()} className="btn-ghost shrink-0">Redo</button>
-      <div className="flex-1 min-w-2" />
-      <button onClick={onOpenAiCutModal} className="btn-accent shrink-0">AI Cut</button>
-      <button onClick={onOpenFontModal} className="btn-accent shrink-0">Text + Font Ω</button>
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onCapturePhoto} />
-      <input ref={projectRef} type="file" accept=".json,application/json" className="hidden" onChange={onPickProject} />
-      <style>{`
-        .btn { padding: 4px 10px; border-radius: 6px; background: #26262d; color: #e5e5e7; font-size: 13px; }
-        .btn:hover { background: #34343d; }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-ghost { padding: 4px 10px; border-radius: 6px; color: #c8c8cf; font-size: 13px; }
-        .btn-ghost:hover { background: #1f1f25; }
-        .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-accent { padding: 4px 12px; border-radius: 6px; background: #ec4899; color: white; font-weight: 500; font-size: 13px; }
-        .btn-accent:hover { background: #db2777; }
-        .btn-camera { padding: 4px 10px; border-radius: 6px; background: #164e63; color: #cffafe; font-size: 13px; }
-        .btn-camera:hover { background: #155e75; }
-      `}</style>
+  async function save(): Promise<void> { try { await downloadBlob(new Blob([toProjectFile(s.doc)], { type: 'application/json' }), `${s.doc.name || 'Untitled'}.pef.json`); s.setNotice('Editable project saved. Use Open Project to continue later.'); } catch { s.setNotice('Could not save project. Check available device storage.'); } }
+  return <>
+    <header className="app-header"><div className="brand"><span className="brand-mark" /><div><strong>Photo Edit Fusion</strong><span>Your everyday creative studio</span></div></div>
+      <input className="project-name" aria-label="Project name" value={s.doc.name} maxLength={80} onChange={(e) => s.commit('Rename project', (d) => { d.name = e.target.value; })} />
+      <div className="header-actions"><button onClick={() => projectRef.current?.click()}><Icon name="folder" /><span>Open Project</span></button><button onClick={() => void save()}><Icon name="save" /><span>Save Project</span></button><button className="primary" onClick={() => setExportOpen(true)}><Icon name="export" /><span>Export</span></button></div>
     </header>
-  );
+    <nav className="file-toolbar" aria-label="File and view controls"><div className="file-actions">
+      <button onClick={() => { if (!canReplace()) return; const next = createDocument({ name: 'Untitled', width: 1600, height: 1000 }); next.background = [0, 0, 0, 0]; s.applyDoc(next); }}><Icon name="plus" />New Canvas</button>
+      <button onClick={() => imageRef.current?.click()}><Icon name="image" />Open Image</button><button onClick={() => addRef.current?.click()}><Icon name="copy" />Add Images</button><button onClick={() => cameraRef.current?.click()}><Icon name="camera" />Take Photo</button>
+    </div><div className="undo-actions"><button aria-label="Undo" title="Undo (Ctrl+Z)" onClick={s.undo} disabled={!s.history.canUndo()}><Icon name="undo" /></button><button aria-label="Redo" title="Redo (Ctrl+Shift+Z)" onClick={s.redo} disabled={!s.history.canRedo()}><Icon name="redo" /></button></div>
+    <div className="zoom-actions"><button aria-label="Zoom out" onClick={() => s.setZoom(s.zoom / 1.25)}><Icon name="minus" /></button><button onClick={s.fitCanvas} title="Fit canvas to workspace">Fit</button><span>{Math.round(s.zoom * 100)}%</span><button aria-label="Zoom in" onClick={() => s.setZoom(s.zoom * 1.25)}><Icon name="plus" /></button></div></nav>
+    <input id="open-image-input" ref={imageRef} type="file" accept="image/*" hidden onChange={(e) => void pick(e, true)} />
+    <input id="add-image-input" ref={addRef} type="file" accept="image/*" multiple hidden onChange={(e) => void pick(e, false)} />
+    <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void pick(e, false)} />
+    <input ref={projectRef} type="file" accept=".json,application/json" hidden onChange={(e) => void openProject(e)} />
+    {exportOpen && <ExportModal onClose={() => setExportOpen(false)} />}
+  </>;
 }

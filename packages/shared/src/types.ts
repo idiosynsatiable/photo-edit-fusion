@@ -32,6 +32,9 @@ export interface LayerCommon {
   maskBitmapId: string | null;
 }
 
+export interface ImageAdjustments {
+  brightness: number; contrast: number; saturation: number; grayscale: number; sepia: number; blur: number;
+}
 export interface ImageLayer extends LayerCommon {
   type: 'image';
   /** id into the asset registry */
@@ -39,6 +42,7 @@ export interface ImageLayer extends LayerCommon {
   /** intrinsic pixel size of the source bitmap */
   sourceWidth: number;
   sourceHeight: number;
+  adjustments?: ImageAdjustments;
 }
 
 export interface TextLayer extends LayerCommon {

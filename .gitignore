@@ -44,3 +44,6 @@ test-results/
 
 # uploaded user assets (server)
 apps/server/data/
+
+# Generated offline OCR assets
+apps/web/public/tesseract/

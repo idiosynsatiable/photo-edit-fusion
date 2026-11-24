@@ -1,110 +1,27 @@
 import React from 'react';
 import { useEditorStore } from '../store/editor-store.js';
-
+import { Icon } from './Icon.js';
 export function LayersPanel(): React.JSX.Element {
-  const doc = useEditorStore((s) => s.doc);
-  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
-  const selectLayer = useEditorStore((s) => s.selectLayer);
-  const setVisible = useEditorStore((s) => s.setVisible);
-  const setLocked = useEditorStore((s) => s.setLocked);
-  const removeLayer = useEditorStore((s) => s.removeLayer);
-  const duplicate = useEditorStore((s) => s.duplicate);
-  const reorder = useEditorStore((s) => s.reorder);
-
-  // top-down rendering = reverse of layerOrder so top layers appear first in the panel
-  const orderedTopDown = [...doc.layerOrder].reverse();
-
-  return (
-    <div className="flex-1 min-h-0 flex flex-col border-b border-ink-700">
-      <div className="px-3 py-2 text-xs uppercase tracking-wider text-zinc-400 border-b border-ink-700">Layers</div>
-      <div className="overflow-y-auto scrollbar-thin">
-        {orderedTopDown.length === 0 && (
-          <div className="px-3 py-6 text-sm text-zinc-500">Open an image, add text, or drop a shape to get started.</div>
-        )}
-        {orderedTopDown.map((id) => {
-          const layer = doc.layers[id];
-          if (!layer) return null;
-          const selected = id === selectedLayerId;
-          return (
-            <div
-              key={id}
-              onClick={() => selectLayer(id)}
-              className={`px-3 py-2 flex items-center gap-2 text-sm cursor-pointer ${
-                selected ? 'bg-pink-500/20 border-l-2 border-pink-500' : 'hover:bg-ink-800'
-              }`}
-            >
-              <button
-                aria-label={layer.visible ? 'Hide' : 'Show'}
-                title={layer.visible ? 'Hide' : 'Show'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setVisible(id, !layer.visible);
-                }}
-                className="w-5 text-zinc-300"
-              >
-                {layer.visible ? '◉' : '◌'}
-              </button>
-              <button
-                aria-label={layer.locked ? 'Unlock' : 'Lock'}
-                title={layer.locked ? 'Unlock' : 'Lock'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLocked(id, !layer.locked);
-                }}
-                className="w-5 text-zinc-400"
-              >
-                {layer.locked ? '🔒' : ' '}
-              </button>
-              <span className="flex-1 truncate">{layer.name}</span>
-              <span className="text-[10px] text-zinc-500 uppercase">{layer.type}</span>
-              <button
-                aria-label="Duplicate"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  duplicate(id);
-                }}
-                className="text-zinc-400 hover:text-zinc-200"
-              >
-                ⎘
-              </button>
-              <button
-                aria-label="Delete"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeLayer(id);
-                }}
-                className="text-zinc-400 hover:text-red-400"
-              >
-                ✕
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      <div className="border-t border-ink-700 px-3 py-2 flex gap-2">
-        <button
-          className="text-xs text-zinc-300 hover:text-white"
-          disabled={!selectedLayerId}
-          onClick={() => {
-            if (!selectedLayerId) return;
-            const idx = doc.layerOrder.indexOf(selectedLayerId);
-            reorder(selectedLayerId, idx + 1);
-          }}
-        >
-          Bring forward
-        </button>
-        <button
-          className="text-xs text-zinc-300 hover:text-white"
-          disabled={!selectedLayerId}
-          onClick={() => {
-            if (!selectedLayerId) return;
-            const idx = doc.layerOrder.indexOf(selectedLayerId);
-            reorder(selectedLayerId, Math.max(0, idx - 1));
-          }}
-        >
-          Send backward
-        </button>
-      </div>
-    </div>
-  );
+  const s = useEditorStore();
+  return <div className="layers-content"><div className="panel-heading"><h2>Layers</h2><span>{s.doc.layerOrder.length}</span></div>
+    {!s.doc.layerOrder.length && <div className="panel-empty"><Icon name="shapes" size={32} /><p>Add an image, text or shape to get started.</p><button onClick={() => document.getElementById('add-image-input')?.click()}><Icon name="plus" />Add Images</button></div>}
+    {[...s.doc.layerOrder].reverse().map((id) => { const l = s.doc.layers[id]!; return <div key={id} className={`layer-row ${s.selectedLayerId === id ? 'selected' : ''}`}>
+      <button className="layer-select" onClick={() => s.selectLayer(id)} aria-label={`Select ${l.name}`}><span className="layer-thumb checker">{l.type === 'image' ? <img src={s.doc.bitmaps[l.bitmapId]} alt="" /> : <Icon name={l.type === 'text' ? 'text' : 'shapes'} />}</span><span><strong>{l.name}</strong><small>{l.type}{l.maskBitmapId ? ' · masked' : ''}</small></span></button>
+      <button aria-label={l.visible ? `Hide ${l.name}` : `Show ${l.name}`} onClick={() => s.setVisible(id, !l.visible)}><Icon name={l.visible ? 'eye' : 'hidden'} size={16} /></button><button aria-label={l.locked ? `Unlock ${l.name}` : `Lock ${l.name}`} onClick={() => s.setLocked(id, !l.locked)}><Icon name={l.locked ? 'lock' : 'unlock'} size={15} /></button>
+    </div>; })}
+    {s.selectedLayerId && <div className="layer-actions">{[
+      { name: 'Bring forward', icon: 'up', run: () => s.reorder(s.selectedLayerId!, s.doc.layerOrder.indexOf(s.selectedLayerId!) + 1) },
+      { name: 'Send backward', icon: 'down', run: () => s.reorder(s.selectedLayerId!, s.doc.layerOrder.indexOf(s.selectedLayerId!) - 1) },
+      { name: 'Duplicate layer', icon: 'copy', run: () => s.duplicate(s.selectedLayerId!) },
+      { name: 'Delete layer', icon: 'trash', run: () => s.removeLayer(s.selectedLayerId!) },
+    ].map((a) => <button key={a.name} aria-label={a.name} title={a.name} onClick={a.run}><Icon name={a.icon} /></button>)}</div>}
+    <div className="panel-add"><button onClick={() => document.getElementById('add-image-input')?.click()}><Icon name="plus" />Image</button><button onClick={() => s.addText('Your text')}><Icon name="text" />Text</button><button aria-label="Add ellipse shape" onClick={() => s.addShape('ellipse')}><Icon name="shapes" />Shape</button></div>
+  </div>;
+}
+export function HistoryPanel(): React.JSX.Element {
+  const s = useEditorStore(), history = s.history.describe();
+  return <div className="history-content"><h2>History</h2><p className="muted">One step per canvas gesture. Up to 200 edits in this session.</p><div className="button-row"><button onClick={s.undo} disabled={!history.undo.length}><Icon name="undo" />Undo</button><button onClick={s.redo} disabled={!history.redo.length}><Icon name="redo" />Redo</button></div>
+    {!history.undo.length && <p className="muted">Your edits will appear here.</p>}<ol>{[...history.undo].reverse().map((label, i) => <li key={i}><span>{history.undo.length - i}</span>{label}</li>)}</ol>
+    {!!history.redo.length && <p className="muted">{history.redo.length} edit(s) available to redo.</p>}
+  </div>;
 }
