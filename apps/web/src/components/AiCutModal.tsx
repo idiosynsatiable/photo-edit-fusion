@@ -114,12 +114,18 @@ export function AiCutModal({ open, onClose }: Props): React.JSX.Element | null {
       data.data[i + 3] = Math.round(t * 255);
     }
     ctx.putImageData(data, 0, 0);
+    if (layer?.maskBitmapId && doc.bitmaps[layer.maskBitmapId]) {
+      const previousMask = await loadImage(doc.bitmaps[layer.maskBitmapId]!);
+      ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(previousMask, 0, 0, c.width, c.height); ctx.globalCompositeOperation = 'source-over';
+    }
     const newDataUrl = c.toDataURL('image/png');
+    ctx.globalCompositeOperation = 'source-in'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.globalCompositeOperation = 'source-over';
+    const maskDataUrl = c.toDataURL('image/png');
     const maskId = crypto.randomUUID();
     commit('Local background mask', (d) => {
       const target = layer ? d.layers[layer.id] : null;
       if (!target || target.type !== 'image' || target.bitmapId !== bitmapId) return;
-      d.bitmaps[maskId] = newDataUrl; target.maskBitmapId = maskId;
+      d.bitmaps[maskId] = maskDataUrl; target.maskBitmapId = maskId;
     });
     const out = await loadImage(newDataUrl);
     drawPreview(out);

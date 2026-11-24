@@ -53,7 +53,8 @@ export function CanvasStage(): React.JSX.Element {
     if (layer.type !== 'image') return null;
     const c = document.createElement('canvas'); c.width = layer.sourceWidth; c.height = layer.sourceHeight; const ctx = c.getContext('2d'); if (!ctx) return null;
     const mask = layer.maskBitmapId ? cache.current.get(layer.maskBitmapId) : null;
-    if (mask) ctx.drawImage(mask, 0, 0, c.width, c.height); else { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); } return c;
+    if (mask) ctx.drawImage(mask, 0, 0, c.width, c.height); else { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+    ctx.globalCompositeOperation = 'source-in'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.globalCompositeOperation = 'source-over'; return c;
   }
   function saveMask(layer: Layer, c: HTMLCanvasElement, label: string): void { const id = crypto.randomUUID(), data = c.toDataURL('image/png'); s.commit(label, (d) => { if (!d.layers[layer.id]) return; d.bitmaps[id] = data; d.layers[layer.id]!.maskBitmapId = id; }); }
   function erase(p: Vec2): void {

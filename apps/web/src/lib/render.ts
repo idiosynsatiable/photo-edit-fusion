@@ -171,8 +171,14 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 /** Build/refresh a bitmap cache from a Document's bitmap registry. */
 export async function loadBitmaps(doc: Document, cache: Map<string, HTMLImageElement | HTMLCanvasElement>): Promise<void> {
   const promises: Promise<void>[] = [];
-  for (const id of cache.keys()) if (!doc.bitmaps[id]) cache.delete(id);
+  const used = new Set<string>();
+  for (const layer of Object.values(doc.layers)) {
+    if (layer.type === 'image') used.add(layer.bitmapId);
+    if (layer.maskBitmapId) used.add(layer.maskBitmapId);
+  }
+  for (const id of cache.keys()) if (!used.has(id)) cache.delete(id);
   for (const [id, dataUrl] of Object.entries(doc.bitmaps)) {
+    if (!used.has(id)) continue;
     const existing = cache.get(id);
     if (existing instanceof HTMLImageElement && existing.src === dataUrl) continue;
     promises.push(
