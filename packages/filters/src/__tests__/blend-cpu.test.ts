@@ -42,3 +42,13 @@ describe('blendPixel', () => {
     expect(r[2]).toBeCloseTo(0.6, 4);
   });
 });
+
+it('preserves source colors on a transparent destination for every blend mode', () => {
+  for (const mode of ['normal', 'multiply', 'linear-burn', 'divide', 'hard-mix'] as const) {
+    expect(blendPixel(mode, [0, 0, 0, 0], [1, .5, .25, .8], .5)).toEqual([1, .5, .25, .4]);
+  }
+});
+it('composites partially transparent layers using source-over alpha', () => {
+  const out = blendPixel('normal', [1, 0, 0, .5], [0, 0, 1, .5], 1);
+  expect(out[3]).toBe(.75); expect(out[0]).toBeCloseTo(1 / 3); expect(out[2]).toBeCloseTo(2 / 3);
+});

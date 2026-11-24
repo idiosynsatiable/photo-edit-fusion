@@ -63,7 +63,10 @@ export function PropertiesPanel({ onCut }: { onCut: () => void }): React.JSX.Ele
     </section>}
   </div>;
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element { return <label className="field"><span>{label}</span>{children}</label>; }
+function Field({ label, children }: { label: string; children: React.ReactNode }): React.JSX.Element {
+  const child = React.Children.only(children) as React.ReactElement<{ 'aria-label'?: string }>;
+  return <label className="field"><span>{label}</span>{React.cloneElement(child, { 'aria-label': child.props['aria-label'] ?? label })}</label>;
+}
 function Range({ label, min, max, value, onChange }: { label: string; min: number; max: number; value: number; onChange: (v: number) => void }): React.JSX.Element {
   const s = useEditorStore(), coalesce = label !== 'Tolerance' && label !== 'Brush size';
   return <label className="field range-field"><span>{label}<output>{value}</output></span><input aria-label={label} type="range" min={min} max={max} value={value} onPointerDown={() => { if (coalesce) s.beginGesture(); }} onChange={(e) => onChange(Number(e.target.value))} onPointerUp={() => { if (coalesce) s.endGesture(`Change ${label.toLowerCase()}`); }} onPointerCancel={() => { if (coalesce) s.cancelGesture(); }} /></label>;
