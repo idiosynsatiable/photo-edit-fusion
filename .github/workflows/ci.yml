@@ -71,6 +71,16 @@ jobs:
         env:
           CI: 'true'
 
+      - name: Record visual QA frames
+        if: always()
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs'), path = require('node:path');
+          const names = new Set(['automatic-font-match.png','scene-color-match.png','editor-desktop.png','editor-mobile.png']);
+          function walk(dir) { if (!fs.existsSync(dir)) return; for (const entry of fs.readdirSync(dir,{withFileTypes:true})) { const file=path.join(dir,entry.name); if(entry.isDirectory())walk(file); else if(names.has(entry.name))console.log('PEF_QA_IMAGE '+entry.name+' '+fs.readFileSync(file).toString('base64')); } }
+          walk('test-results');
+          NODE
+
       - name: Upload Playwright diagnostics
         if: always()
         uses: actions/upload-artifact@v4

@@ -80,10 +80,16 @@ jobs:
           test -s android/app/src/main/assets/public/tesseract/worker.min.js
           test -s android/app/src/main/assets/public/tesseract/lang/eng.traineddata
 
+      - name: Verify bundled fonts and licenses
+        run: |
+          test -s apps/web/dist/font-licenses/inter.txt
+          test -s apps/web/dist/font-licenses/bebas-neue.txt
+          find apps/web/dist/assets -name '*.woff2' | grep .
+
       - name: Set preview version
         run: |
           sed -i 's/versionCode 1/versionCode ${{ github.run_number }}/' android/app/build.gradle
-          sed -i 's/versionName "1.0"/versionName "1.1.0-preview"/' android/app/build.gradle
+          sed -i 's/versionName "1.0"/versionName "1.2.0-preview"/' android/app/build.gradle
 
       - name: Assemble debug APK
         working-directory: android
@@ -143,9 +149,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp release/app-debug.apk release/Photo-Edit-Fusion-1.1.0-preview.apk
+          cp release/app-debug.apk release/Photo-Edit-Fusion-1.2.0-preview.apk
           cd release
-          sha256sum Photo-Edit-Fusion-1.1.0-preview.apk > SHA256SUMS.txt
+          sha256sum Photo-Edit-Fusion-1.2.0-preview.apk > SHA256SUMS.txt
           cd ..
-          gh release create "editor-revamp-${{ github.run_number }}" release/Photo-Edit-Fusion-1.1.0-preview.apk release/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "Photo Edit Fusion 1.1.0 Preview" --notes "Revamped local photo editor with crop, resize, editable layers and masks, adjustments, text and shape styling, history, project recovery and PNG/JPEG/WebP export. Debug-signed Android preview; emulator install and launch checked. Physical Samsung, live Gemini/TITAN and advanced AI editing remain unverified."
-          gh release view "editor-revamp-${{ github.run_number }}" --json url --jq .url
+          gh release create "typography-scene-${{ github.run_number }}" release/Photo-Edit-Fusion-1.2.0-preview.apk release/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "Photo Edit Fusion 1.2.0 Preview" --notes "Offline visual font fitting across 14 bundled Latin families and imported fonts, English OCR, editable text styling, reversible scene color matching, soft mask edges and print-size PNG/JPEG export. Includes undo and project recovery. Debug-signed preview; automated editor tests and emulator install/launch checked. Physical Samsung and real print proofing remain unverified. Font matches are approximations when the source face is absent; no forensic-undetectability guarantee."
+          gh release view "typography-scene-${{ github.run_number }}" --json url --jq .url

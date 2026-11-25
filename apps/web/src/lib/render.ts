@@ -1,6 +1,8 @@
+import { paintText, ensureProjectFonts } from './typography.js';
+import { correctPixels } from './color-transfer.js';
 import { compositeCanvas2D } from '@pef/filters';
 import { CANVAS2D_FALLBACK, WEBGL_REQUIRED } from '@pef/shared';
-import type { Document, Layer, ImageLayer, ShapeLayer, TextLayer } from '@pef/shared';
+import type { Document, Layer, ImageLayer, ImageAdjustments, ShapeLayer, TextLayer } from '@pef/shared';
 
 /**
  * Canvas2D-based renderer. Walks the layer order and draws each layer onto
@@ -65,7 +67,8 @@ function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, bitmaps: Map<str
 }
 
 function drawImageLayer(ctx: CanvasRenderingContext2D, layer: ImageLayer, bitmaps: Map<string, HTMLImageElement | HTMLCanvasElement>): void {
-  const img = bitmaps.get(layer.bitmapId);
+  const original = bitmaps.get(layer.bitmapId);
+  const img = original ? correctedBitmap(original, layer.harmonization, layer.adjustments) : undefined;
   if (!img) return;
   const w = layer.sourceWidth;
   const h = layer.sourceHeight;
@@ -73,9 +76,9 @@ function drawImageLayer(ctx: CanvasRenderingContext2D, layer: ImageLayer, bitmap
   const y = -h * layer.transform.anchor.y;
   const mask = layer.maskBitmapId ? bitmaps.get(layer.maskBitmapId) : undefined;
   const a = layer.adjustments;
-  if (a) ctx.filter = `brightness(${1 + a.brightness}) contrast(${1 + a.contrast}) saturate(${1 + a.saturation}) grayscale(${a.grayscale}) sepia(${a.sepia}) blur(${a.blur}px)`;
+  if (a && !layer.harmonization?.strength) ctx.filter = adjustmentFilter(a);
 
-  if (!mask) {
+  if (!mask && !layer.featherPx) {
     ctx.drawImage(img, x, y, w, h);
     return;
   }
@@ -92,30 +95,18 @@ function drawImageLayer(ctx: CanvasRenderingContext2D, layer: ImageLayer, bitmap
   }
   maskCtx.drawImage(img, 0, 0, w, h);
   maskCtx.globalCompositeOperation = 'destination-in';
-  maskCtx.drawImage(mask, 0, 0, w, h);
+  if (layer.featherPx) {
+    const feather = document.createElement('canvas'), pad = Math.ceil(layer.featherPx * 3);
+    feather.width = w + pad * 2; feather.height = h + pad * 2;
+    const fctx = feather.getContext('2d')!; fctx.filter = 'blur(' + layer.featherPx + 'px)';
+    if (mask) fctx.drawImage(mask,pad,pad,w,h); else { fctx.fillStyle = '#fff'; fctx.fillRect(pad,pad,w,h); }
+    maskCtx.drawImage(feather,-pad,-pad);
+  } else if (mask) maskCtx.drawImage(mask,0,0,w,h);
   maskCtx.globalCompositeOperation = 'source-over';
   ctx.drawImage(masked, x, y, w, h);
 }
 
-function drawTextLayer(ctx: CanvasRenderingContext2D, layer: TextLayer): void {
-  const [r, g, b, a] = layer.color;
-  ctx.fillStyle = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
-  ctx.font = `${layer.fontStyle} ${layer.fontWeight} ${layer.fontSizePx}px ${layer.fontFamily.includes(',') || layer.fontFamily.includes('"') ? layer.fontFamily : `"${layer.fontFamily}"`}`;
-  ctx.textBaseline = 'top';
-  const lines = layer.text.split(/\n/);
-  const w = Math.max(1, ...lines.map((l) => l.length)) * layer.fontSizePx * 0.55;
-  const h = lines.length * layer.fontSizePx * layer.lineHeight;
-  const ox = -w * layer.transform.anchor.x; let y = -h * layer.transform.anchor.y;
-  ctx.textAlign = 'left';
-  for (const line of lines) {
-    const tracking = layer.letterSpacingEm * layer.fontSizePx;
-    const lineWidth = ctx.measureText(line).width + Math.max(0, line.length - 1) * tracking;
-    let x = ox + (layer.align === 'center' ? (w - lineWidth) / 2 : layer.align === 'right' ? w - lineWidth : 0);
-    if (!tracking) ctx.fillText(line, x, y);
-    else for (const ch of line) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + tracking; }
-    y += layer.fontSizePx * layer.lineHeight;
-  }
-}
+function drawTextLayer(ctx: CanvasRenderingContext2D, layer: TextLayer): void { paintText(ctx, layer); }
 
 function drawShapeLayer(ctx: CanvasRenderingContext2D, layer: ShapeLayer): void {
   const w = layer.width;
@@ -193,5 +184,18 @@ export async function loadBitmaps(doc: Document, cache: Map<string, HTMLImageEle
       }),
     );
   }
-  await Promise.all(promises);
+  await Promise.all([...promises, ensureProjectFonts(doc)]);
+}
+
+function adjustmentFilter(a: ImageAdjustments): string {
+  return 'brightness(' + (1+a.brightness) + ') contrast(' + (1+a.contrast) + ') saturate(' + (1+a.saturation) + ') grayscale(' + a.grayscale + ') sepia(' + a.sepia + ') blur(' + a.blur + 'px)';
+}
+const corrections = new WeakMap<HTMLImageElement | HTMLCanvasElement,{key:string;canvas:HTMLCanvasElement}>();
+function correctedBitmap(source: HTMLImageElement | HTMLCanvasElement, effect: ImageLayer['harmonization'], adjustments: ImageLayer['adjustments']): HTMLImageElement | HTMLCanvasElement {
+  if (!effect?.strength) return source;
+  const key = JSON.stringify({ effect, adjustments }), cached = corrections.get(source); if (cached?.key === key) return cached.canvas;
+  const canvas = document.createElement('canvas'); canvas.width = source.width; canvas.height = source.height;
+  const ctx = canvas.getContext('2d',{willReadFrequently:true})!; if (adjustments) ctx.filter = adjustmentFilter(adjustments); ctx.drawImage(source,0,0);
+  const image = ctx.getImageData(0,0,canvas.width,canvas.height); correctPixels(image.data,effect); ctx.putImageData(image,0,0);
+  corrections.set(source,{key,canvas}); return canvas;
 }

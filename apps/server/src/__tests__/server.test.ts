@@ -64,16 +64,14 @@ describe('GET /api/integrations', () => {
 });
 
 describe('POST /api/font-id', () => {
-  it('falls back to local similarity when no keys are set', async () => {
+  it('does not invent image-specific font results without a configured provider', async () => {
     const r = await app.inject({
       method: 'POST',
       url: '/api/font-id',
       payload: { imageBase64: 'A'.repeat(40) },
     });
-    expect(r.statusCode).toBe(200);
-    const body = r.json() as { provider: string; matches: unknown[] };
-    expect(body.provider).toBe('google-fonts-similarity');
-    expect(body.matches.length).toBeGreaterThan(0);
+    expect(r.statusCode).toBe(503);
+    expect(r.json().error).toBe('integration_disabled');
   });
 
   it('rejects invalid request body', async () => {

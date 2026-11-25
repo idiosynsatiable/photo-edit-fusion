@@ -59,7 +59,7 @@ export function CanvasStage(): React.JSX.Element {
   function saveMask(layer: Layer, c: HTMLCanvasElement, label: string): void { const id = crypto.randomUUID(), data = c.toDataURL('image/png'); s.commit(label, (d) => { if (!d.layers[layer.id]) return; d.bitmaps[id] = data; d.layers[layer.id]!.maskBitmapId = id; }); }
   function erase(p: Vec2): void {
     const g = gesture.current; if (!g?.layer || !g.mask) return; const ctx = g.mask.getContext('2d')!, q = local(p, g.layer), last = g.last ?? q;
-    ctx.globalCompositeOperation = 'destination-out'; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = s.brushSize / Math.abs(g.layer.transform.scale.x); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(q.x + .01, q.y); ctx.stroke(); g.last = q;
+    ctx.globalCompositeOperation = s.restoreMask ? 'source-over' : 'destination-out'; ctx.strokeStyle = '#fff'; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = s.brushSize / Math.abs(g.layer.transform.scale.x); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(q.x + .01, q.y); ctx.stroke(); g.last = q;
     const ctxPreview = canvasRef.current?.getContext('2d'), tempId = '__gesture_mask';
     if (ctxPreview) { const previewCache = new Map<string, HTMLImageElement | HTMLCanvasElement>(cache.current); previewCache.set(tempId, g.mask); renderDocument({ doc: { ...doc, layers: { ...doc.layers, [g.layer.id]: { ...g.layer, maskBitmapId: tempId } } }, ctx: ctxPreview, bitmapCache: previewCache }); }
   }
@@ -101,7 +101,7 @@ export function CanvasStage(): React.JSX.Element {
     if (cancel) { s.cancelGesture(); const ctx = canvasRef.current?.getContext('2d'); if (ctx) renderDocument({ doc, ctx, bitmapCache: cache.current }); return; }
     if (activeTool === 'move') s.endGesture(g.resize ? 'Resize layer' : 'Move layer');
     else if (activeTool === 'crop' && g.points.length > 1) { const end = g.points[1]!, x = Math.round(Math.max(0, Math.min(g.start.x, end.x))), y = Math.round(Math.max(0, Math.min(g.start.y, end.y))), w = Math.round(Math.min(doc.width, Math.max(g.start.x, end.x)) - x), h = Math.round(Math.min(doc.height, Math.max(g.start.y, end.y)) - y); if (w > 2 && h > 2) s.cropCanvas(x, y, w, h); }
-    else if (activeTool === 'eraser' && g.layer && g.mask) { s.cancelGesture(); saveMask(g.layer, g.mask, 'Erase mask'); }
+    else if (activeTool === 'eraser' && g.layer && g.mask) { s.cancelGesture(); saveMask(g.layer, g.mask, s.restoreMask ? 'Restore mask brush' : 'Erase mask'); }
     else if (g.layer && g.points.length > 2 && g.layer.type === 'image') {
       const c = baseMask(g.layer); if (!c) return; const ctx = c.getContext('2d')!, data = ctx.getImageData(0, 0, c.width, c.height), mask = rasterizePolygon(c.width, c.height, g.points.map((p) => local(p, g.layer!)));
       for (let i = 0; i < mask.data.length; i++) data.data[i * 4 + 3] = Math.round(data.data[i * 4 + 3]! * mask.data[i]! / 255);

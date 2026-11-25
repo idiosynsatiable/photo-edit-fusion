@@ -43,6 +43,10 @@ export interface ImageLayer extends LayerCommon {
   sourceWidth: number;
   sourceHeight: number;
   adjustments?: ImageAdjustments;
+  /** Reversible scene-derived channel correction; original bitmap is retained. */
+  harmonization?: { gain: [number, number, number]; bias: [number, number, number]; strength: number };
+  /** Soft mask edge in source pixels. */
+  featherPx?: number;
 }
 
 export interface TextLayer extends LayerCommon {
@@ -61,6 +65,10 @@ export interface TextLayer extends LayerCommon {
   color: [number, number, number, number];
   /** Optional Google Fonts URL the family was loaded from */
   webFontUrl: string | null;
+  /** Actual ink metrics at 1em, shared by rendering, selection and export. */
+  inkMetrics?: { width: number; height: number; left: number; ascent: number };
+  outline?: { width: number; color: [number, number, number, number] };
+  shadow?: { blur: number; x: number; y: number; color: [number, number, number, number] };
 }
 
 export interface ShapeLayer extends LayerCommon {
@@ -97,6 +105,8 @@ export interface Document {
   /** raster bitmap registry — base64 data URLs keyed by id */
   bitmaps: Record<string, string>;
   background: [number, number, number, number];
+  /** User-supplied font files travel with editable projects for offline reopening. */
+  fonts?: Record<string, { family: string; dataUrl: string; weight: string; style: 'normal' | 'italic' }>;
   meta: {
     createdAt: string;
     modifiedAt: string;

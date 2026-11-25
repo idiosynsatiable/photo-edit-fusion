@@ -34,6 +34,12 @@ const ImageLayerSchema = LayerCommonSchema.extend({
   bitmapId: z.string().min(1),
   sourceWidth: z.number().finite().int().positive(),
   sourceHeight: z.number().finite().int().positive(),
+  harmonization: z.object({
+    gain: z.tuple([z.number().min(.25).max(4), z.number().min(.25).max(4), z.number().min(.25).max(4)]),
+    bias: z.tuple([z.number().min(-255).max(255), z.number().min(-255).max(255), z.number().min(-255).max(255)]),
+    strength: z.number().min(0).max(1),
+  }).optional(),
+  featherPx: z.number().min(0).max(80).optional(),
   adjustments: z.object({
     brightness: z.number().finite().min(-1).max(1),
     contrast: z.number().finite().min(-1).max(1),
@@ -56,6 +62,9 @@ const TextLayerSchema = LayerCommonSchema.extend({
   align: z.enum(['left', 'center', 'right', 'justify']),
   color: RGBASchema,
   webFontUrl: z.string().url().nullable(),
+  inkMetrics: z.object({ width: z.number().finite().positive(), height: z.number().finite().positive(), left: z.number().finite(), ascent: z.number().finite() }).optional(),
+  outline: z.object({ width: z.number().min(0).max(100), color: RGBASchema }).optional(),
+  shadow: z.object({ blur: z.number().min(0).max(100), x: z.number().min(-500).max(500), y: z.number().min(-500).max(500), color: RGBASchema }).optional(),
 });
 
 const ShapeLayerSchema = LayerCommonSchema.extend({
@@ -91,6 +100,7 @@ export const DocumentSchema = z.object({
   layers: z.record(z.string(), LayerSchema),
   bitmaps: z.record(z.string(), z.string()),
   background: RGBASchema,
+  fonts: z.record(z.string(), z.object({ family: z.string().min(1), dataUrl: z.string().startsWith('data:'), weight: z.string(), style: z.enum(['normal', 'italic']) })).optional(),
   meta: z.object({
     createdAt: z.string(),
     modifiedAt: z.string(),

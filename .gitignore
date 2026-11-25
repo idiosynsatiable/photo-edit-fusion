@@ -47,3 +47,7 @@ apps/server/data/
 
 # Generated offline OCR assets
 apps/web/public/tesseract/
+
+# Generated desktop renderer and licensed font copies
+apps/desktop/renderer/
+apps/web/public/font-licenses/
