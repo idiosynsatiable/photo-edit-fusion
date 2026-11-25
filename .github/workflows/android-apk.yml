@@ -80,6 +80,12 @@ jobs:
           test -s android/app/src/main/assets/public/tesseract/worker.min.js
           test -s android/app/src/main/assets/public/tesseract/lang/eng.traineddata
 
+      - name: Verify bundled fonts and licenses
+        run: |
+          test -s apps/web/dist/font-licenses/inter.txt
+          test -s apps/web/dist/font-licenses/bebas-neue.txt
+          find apps/web/dist/assets -name '*.woff2' | grep .
+
       - name: Set preview version
         run: |
           sed -i 's/versionCode 1/versionCode ${{ github.run_number }}/' android/app/build.gradle

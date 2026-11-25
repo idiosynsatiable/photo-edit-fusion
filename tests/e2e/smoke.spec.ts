@@ -28,7 +28,8 @@ test('text tool adds a layer', async ({ page }) => {
 test('opening font extract modal is reachable', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Font Extract (F)', exact: true }).click();
-  await expect(page.getByText('Ω Text & Font Extraction')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Text and font extraction' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Find the look. Keep it editable.', exact: true })).toBeVisible();
 });
 
 test('keyboard shortcut V switches to move tool', async ({ page }) => {

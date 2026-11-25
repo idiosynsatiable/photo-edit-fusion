@@ -39,7 +39,7 @@ test('scene matching preserves originals through undo and reload',async({page})=
 test('imported font files survive project save and reopen offline',async({page,context})=>{
   await page.goto('/');await page.getByRole('button',{name:'Font Extract (F)',exact:true}).click();const font=await readFile('apps/web/node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff2');
   await page.getByLabel('Import font',{exact:true}).setInputFiles({name:'MyLicensedDisplay.woff2',mimeType:'font/woff2',buffer:font});await expect(page.getByText('Font imported. It is included when you save this project. Fit the line again to include it.')).toBeVisible();await page.getByRole('button',{name:'Close font matching',exact:true}).click();await page.getByRole('button',{name:'Text (T)',exact:true}).click();
-  const options=await page.getByLabel('Font family',{exact:true}).locator('option').allTextContents(),imported=options.find((v)=>v.startsWith('MyLicensedDisplay-'))!;expect(imported).toBeTruthy();await page.getByLabel('Font family',{exact:true}).selectOption(imported);const project=await saveProject(page);expect(Object.values(project.document.fonts)).toHaveLength(1);await context.setOffline(true);
+  const options=await page.getByLabel('Font family',{exact:true}).locator('option').allTextContents(),imported=options.find((v)=>v.startsWith('MyLicensedDisplay-'))!;expect(imported).toBeTruthy();await page.getByLabel('Font family',{exact:true}).selectOption(imported);const project=await saveProject(page);expect(Object.values(project.document.fonts)).toHaveLength(1);await expect(page.getByText('Saved on this device',{exact:true})).toBeVisible();await page.reload();await expect.poll(()=>page.evaluate((family)=>[...document.fonts].some((face)=>face.family===family&&face.status==='loaded'),imported)).toBe(true);await context.setOffline(true);
   await page.locator('input[accept=".json,application/json"]').setInputFiles({name:'typography.pef.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(project))});
   await expect(page.getByText('Saved on this device',{exact:true})).toBeVisible();const resaved=await saveProject(page);expect(resaved.document.fonts).toEqual(project.document.fonts);expect(resaved.document.layers[resaved.document.layerOrder[0]].fontFamily).toBe(imported);
 });
@@ -51,4 +51,22 @@ test('print PNG embeds density and sticker export retains all corner pixels',asy
 test('adding images preserves a configured empty canvas',async({page})=>{
   await page.goto('/');await page.getByLabel('Canvas width',{exact:true}).fill('600');await page.getByLabel('Canvas height',{exact:true}).fill('400');await page.getByRole('button',{name:'Resize canvas',exact:true}).click();
   const data=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=100;c.height=70;return c.toDataURL().split(',')[1]!;});await openRaster(page,data,'added.png',true);await expect(page.getByLabel('Canvas width',{exact:true})).toHaveValue('600');await expect(page.getByLabel('Canvas height',{exact:true})).toHaveValue('400');
+});
+
+test('scene matching measures and renders existing adjustments in the same order',async({page})=>{
+  await page.goto('/');
+  const data=async(color:string)=>page.evaluate((color)=>{const c=document.createElement('canvas');c.width=96;c.height=64;const x=c.getContext('2d')!;x.fillStyle=color;x.fillRect(0,0,96,64);return c.toDataURL().split(',')[1]!;},color);
+  await openRaster(page,await data('rgb(100,140,160)'),'background.png');await openRaster(page,await data('rgb(170,90,60)'),'overlay.png',true);
+  await page.getByLabel('Brightness',{exact:true}).fill('20');
+  await page.getByRole('button',{name:'Match scene automatically',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Match scene',exact:true});await expect(dialog.getByRole('button',{name:'Apply scene match',exact:true})).toBeEnabled();await dialog.getByLabel('Match strength',{exact:true}).fill('100');await dialog.getByLabel('Scene edge feather',{exact:true}).fill('0');
+  await page.screenshot({path:test.info().outputPath('scene-color-match.png')});
+  await dialog.getByRole('button',{name:'Apply scene match',exact:true}).click();await expect.poll(()=>pixels(page)).toEqual([100,140,160,255]);
+});
+test('mask restoration and feathering preserve the original image',async({page})=>{
+  await page.goto('/');const data=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=128;c.height=96;const x=c.getContext('2d')!;x.fillStyle='#278d71';x.fillRect(0,0,128,96);return c.toDataURL().split(',')[1]!;});await openRaster(page,data);
+  await page.getByRole('button',{name:'Eraser (E)',exact:true}).click();const box=(await page.locator('.artboard').boundingBox())!;
+  await page.mouse.click(box.x+box.width/2,box.y+box.height/2);await expect.poll(async()=>(await pixels(page))[3]).toBe(0);
+  await page.getByRole('button',{name:'Restore mask',exact:true}).click();await page.mouse.click(box.x+box.width/2,box.y+box.height/2);await expect.poll(()=>pixels(page)).toEqual([39,141,113,255]);
+  await page.getByRole('button',{name:'Undo',exact:true}).click();await expect.poll(async()=>(await pixels(page))[3]).toBe(0);await page.getByRole('button',{name:'Redo',exact:true}).click();
+  await page.getByLabel('Edge feather (px)',{exact:true}).fill('6');await expect.poll(()=>page.getByLabel('Photo editing canvas').evaluate((c:HTMLCanvasElement)=>c.getContext('2d')!.getImageData(0,0,1,1).data[3])).toBeLessThan(240);await expect.poll(async()=>(await pixels(page))[3]).toBe(255);
 });
