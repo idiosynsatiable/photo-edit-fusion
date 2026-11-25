@@ -9,13 +9,13 @@ export function transformToMatrix(t: Transform, width: number, height: number): 
   const sx = t.scale.x;
   const sy = t.scale.y;
 
-  // T(pos) * T(anchor) * R * S * T(-anchor)
+  // T(pos) * R * S * T(-anchor), matching Canvas2D rendering
   const a = c * sx;
   const b = s * sx;
   const d = -s * sy;
   const e = c * sy;
-  const tx = t.position.x + cx - a * cx - d * cy;
-  const ty = t.position.y + cy - b * cx - e * cy;
+  const tx = t.position.x - a * cx - d * cy;
+  const ty = t.position.y - b * cx - e * cy;
 
   // column-major 3x3
   return new Float32Array([a, b, 0, d, e, 0, tx, ty, 1]);

@@ -1,239 +1,117 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createWorker } from 'tesseract.js';
-import { loadBitmaps, renderDocument } from '../lib/render.js';
+import { createWorker, PSM } from 'tesseract.js';
+import { addTextLayer } from '@pef/canvas-engine';
+import type { TextLayer } from '@pef/shared';
 import { useEditorStore } from '../store/editor-store.js';
-import { loadGoogleFontByUrl } from '../lib/font-loader.js';
-import type { FontMatch } from '@pef/shared';
-import { binarizeOtsu, extractFeatures, LocalSimilarityProvider } from '@pef/font-match';
-
-interface Props { open: boolean; onClose: () => void }
-interface CropRect { x: number; y: number; w: number; h: number }
-
-export function FontExtractModal({ open, onClose }: Props): React.JSX.Element | null {
-  const addText = useEditorStore((s) => s.addText);
-  const lastFontMatches = useEditorStore((s) => s.lastFontMatches);
-  const lastFontMatchProvider = useEditorStore((s) => s.lastFontMatchProvider);
-  const sourceCanvasRef = useRef<HTMLCanvasElement>(null);
-  const previewRef = useRef<HTMLCanvasElement>(null);
-  const [crop, setCrop] = useState<CropRect | null>(null);
-  const [drag, setDrag] = useState<CropRect | null>(null);
-  const [working, setWorking] = useState(false);
-  const [ocrWorking, setOcrWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [extractedText, setExtractedText] = useState('');
-
+import { loadBitmaps, renderDocument } from '../lib/render.js';
+import { matchingCandidates, paintText, ensureProjectFonts } from '../lib/typography.js';
+import { fitVisualFont, sampleInk, type InkSample, type VisualMatch } from '../lib/visual-font-match.js';
+import { readFileAsDataUrl } from '../lib/file-utils.js';
+import { Icon } from './Icon.js';
+interface Rect { x: number; y: number; w: number; h: number }
+interface Line { text: string; confidence: number; rect: Rect }
+export function FontExtractModal({ open, onClose }: { open: boolean; onClose: () => void }): React.JSX.Element | null {
+  const source = useRef<HTMLCanvasElement>(null), preview = useRef<HTMLCanvasElement>(null), worker = useRef<Awaited<ReturnType<typeof createWorker>> | null>(null);
+  const operation = useRef<AbortController | null>(null), session = useRef(0), start = useRef<{x:number;y:number} | null>(null);
+  const [crop,setCrop] = useState<Rect | null>(null), [lines,setLines] = useState<Line[]>([]), [text,setText] = useState('');
+  const [matches,setMatches] = useState<VisualMatch[]>([]), [sample,setSample] = useState<InkSample | null>(null), [chosen,setChosen] = useState(0);
+  const [busy,setBusy] = useState(''), [error,setError] = useState(''), [ready,setReady] = useState(false), [confidence,setConfidence] = useState<number | null>(null);
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    const doc = useEditorStore.getState().doc, dst = sourceCanvasRef.current;
-    if (!dst) return;
-    const ratio = Math.min(1, 720 / doc.width);
-    dst.width = Math.max(1, Math.round(doc.width * ratio)); dst.height = Math.max(1, Math.round(doc.height * ratio));
-    void (async () => { const cache = new Map<string, HTMLImageElement>(); await loadBitmaps(doc, cache); if (cancelled) return; const ctx = dst.getContext('2d'); if (ctx) { ctx.scale(ratio, ratio); renderDocument({ doc, ctx, bitmapCache: cache }); } })();
-    setCrop(null);
-    setExtractedText('');
-    setError(null);
-    return () => { cancelled = true; };
-  }, [open]);
-
-  function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>): void {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const r = e.currentTarget.getBoundingClientRect();
-    const sx = e.currentTarget.width / r.width;
-    const sy = e.currentTarget.height / r.height;
-    setDrag({ x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy, w: 0, h: 0 });
+    const id = ++session.current;
+    setCrop(null); setLines([]); setText(''); setMatches([]); setSample(null); setError(''); setReady(false); setConfidence(null); setBusy('');
+    void (async () => {
+      const doc = useEditorStore.getState().doc, cache = new Map<string,HTMLImageElement>(); await loadBitmaps(doc,cache);
+      if (session.current !== id || !source.current) return;
+      source.current.width = doc.width; source.current.height = doc.height;
+      renderDocument({doc,ctx:source.current.getContext('2d')!,bitmapCache:cache}); setReady(true);
+    })().catch((e: unknown) => { if (session.current === id) setError(String(e)); });
+    return () => { ++session.current; operation.current?.abort(); void worker.current?.terminate(); worker.current = null; };
+  },[open]);
+  function cancel(): void { operation.current?.abort(); operation.current = null; void worker.current?.terminate(); worker.current = null; setBusy(''); }
+  function select(rect: Rect, wording = '', certainty: number | null = null): void { setCrop(rect); setText(wording); setConfidence(certainty); setMatches([]); setSample(null); setError(''); }
+  function point(e: React.PointerEvent<HTMLCanvasElement>): {x:number;y:number} {
+    const c=e.currentTarget,r=c.getBoundingClientRect(); return {x:Math.max(0,Math.min(c.width,(e.clientX-r.left)/r.width*c.width)),y:Math.max(0,Math.min(c.height,(e.clientY-r.top)/r.height*c.height))};
   }
-
-  function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>): void {
-    if (!drag) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const sx = e.currentTarget.width / r.width;
-    const sy = e.currentTarget.height / r.height;
-    setDrag({ ...drag, w: (e.clientX - r.left) * sx - drag.x, h: (e.clientY - r.top) * sy - drag.y });
-  }
-
-  function onPointerUp(e: React.PointerEvent<HTMLCanvasElement>): void {
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-    if (!drag) return;
-    const c: CropRect = {
-      x: drag.w < 0 ? drag.x + drag.w : drag.x,
-      y: drag.h < 0 ? drag.y + drag.h : drag.y,
-      w: Math.abs(drag.w),
-      h: Math.abs(drag.h),
-    };
-    setDrag(null);
-    if (c.w < 8 || c.h < 8) return;
-    setCrop(c);
-    setExtractedText('');
-    renderPreview(c);
-  }
-
-  function renderPreview(c: CropRect): void {
-    const src = sourceCanvasRef.current;
-    const dst = previewRef.current;
-    if (!src || !dst) return;
-    dst.width = Math.max(1, Math.round(c.w));
-    dst.height = Math.max(1, Math.round(c.h));
-    const ctx = dst.getContext('2d');
-    if (ctx) ctx.drawImage(src, c.x, c.y, c.w, c.h, 0, 0, dst.width, dst.height);
-  }
-
-  async function extractText(): Promise<void> {
-    const canvas = previewRef.current;
-    if (!canvas) return;
-    setOcrWorking(true);
-    setError(null);
-    let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+  function rectFrom(p:{x:number;y:number},q:{x:number;y:number}): Rect { return {x:Math.floor(Math.min(p.x,q.x)),y:Math.floor(Math.min(p.y,q.y)),w:Math.max(1,Math.ceil(Math.abs(q.x-p.x))),h:Math.max(1,Math.ceil(Math.abs(q.y-p.y)))}; }
+  function region(rect: Rect): HTMLCanvasElement { const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(rect.w)); c.height=Math.max(1,Math.round(rect.h)); c.getContext('2d')!.drawImage(source.current!,rect.x,rect.y,rect.w,rect.h,0,0,c.width,c.height); return c; }
+  async function recognize(all: boolean): Promise<void> {
+    const src=source.current; if (!src || (!all && !crop)) return;
+    const token=session.current,controller=new AbortController(); operation.current=controller; setError(''); setBusy(all?'Scanning image…':'Reading selected line…');
+    let active: Awaited<ReturnType<typeof createWorker>> | null=null;
     try {
-      worker = await createWorker('eng', 1, {
-        workerPath: '/tesseract/worker.min.js',
-        langPath: '/tesseract/lang',
-        corePath: '/tesseract/core',
-        workerBlobURL: false,
-        gzip: false,
-      });
-      const result = await worker.recognize(canvas);
-      setExtractedText(result.data.text.trim());
-      if (!result.data.text.trim()) setError('No readable text found. Try a tighter crop with larger, sharper lettering.');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Text extraction failed.');
-    } finally {
-      if (worker) await worker.terminate();
-      setOcrWorking(false);
-    }
+      const rect=all?{x:0,y:0,w:src.width,h:src.height}:crop!,input=region(rect),scale=Math.min(1,Math.sqrt(4_000_000/(input.width*input.height)));
+      const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(input.width*scale)); c.height=Math.max(1,Math.round(input.height*scale)); c.getContext('2d')!.drawImage(input,0,0,c.width,c.height);
+      active=await createWorker('eng',1,{workerPath:'./tesseract/worker.min.js',langPath:'./tesseract/lang',corePath:'./tesseract/core',workerBlobURL:false,gzip:false});
+      if (controller.signal.aborted || token!==session.current) { await active.terminate(); return; }
+      worker.current=active; await active.setParameters({tessedit_pageseg_mode:all?PSM.AUTO:PSM.SINGLE_LINE});
+      const result=await active.recognize(c); if (controller.signal.aborted || token!==session.current) return;
+      if (all) {
+        const found=(result.data.lines??[]).filter((l)=>l.text.trim()).map((l)=>{
+          const x=Math.max(0,Math.floor(l.bbox.x0/scale)-3),y=Math.max(0,Math.floor(l.bbox.y0/scale)-3);
+          return {text:l.text.trim(),confidence:l.confidence,rect:{x,y,w:Math.min(src.width-x,Math.ceil(l.bbox.x1/scale)+3-x),h:Math.min(src.height-y,Math.ceil(l.bbox.y1/scale)+3-y)}};
+        });
+        setLines(found); if (found[0]) select(found[0].rect,found[0].text,found[0].confidence);
+        else throw new Error('No readable lines found. Drag around one line and enter its wording to fit it visually.');
+      } else { setText(result.data.text.trim().replace(/\n/g,' ')); setConfidence(result.data.confidence); if (!result.data.text.trim()) throw new Error('Could not read this line. Enter its wording below, then fit the font.'); }
+    } catch(e) { if (!controller.signal.aborted && token===session.current) setError(e instanceof Error?e.message:String(e)); }
+    finally { if (worker.current===active) worker.current=null; if (active && !controller.signal.aborted) await active.terminate(); if (token===session.current && operation.current===controller) setBusy(''); }
   }
-
-  async function identify(): Promise<void> {
-    const canvas = previewRef.current;
-    if (!canvas) return;
-    setWorking(true);
-    setError(null);
-    let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+  async function fit(): Promise<void> {
+    if (!crop || !text.trim()) return;
+    const token=session.current,controller=new AbortController(); operation.current=controller; setBusy('Loading offline fonts…'); setError(''); setMatches([]);
     try {
-      worker = await createWorker('eng', 1, {
-        workerPath: '/tesseract/worker.min.js',
-        langPath: '/tesseract/lang',
-        corePath: '/tesseract/core',
-        workerBlobURL: false,
-        gzip: false,
-      });
-      const recognition = await worker.recognize(canvas);
-      const ocr = recognition.data as unknown as {
-        text: string;
-        words?: Array<{ confidence: number; bbox: { x0: number; y0: number; x1: number; y1: number } }>;
-      };
-      if (ocr.text.trim()) setExtractedText(ocr.text.trim());
-      const image = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height);
-      if (!image) throw new Error('Could not read the selected text region.');
-      const boxes = (ocr.words ?? [])
-        .filter((word) => word.confidence >= 25)
-        .map((word) => ({
-          x: word.bbox.x0,
-          y: word.bbox.y0,
-          width: Math.max(1, word.bbox.x1 - word.bbox.x0),
-          height: Math.max(1, word.bbox.y1 - word.bbox.y0),
-        }));
-      const glyphBoxes = boxes.length ? boxes : [{ x: 0, y: 0, width: canvas.width, height: canvas.height }];
-      const features = extractFeatures(binarizeOtsu({
-        width: image.width,
-        height: image.height,
-        data: image.data,
-      }), image.width, image.height, glyphBoxes);
-      const local = await new LocalSimilarityProvider().identify({
-        imageBytes: new Uint8Array(image.data),
-        contentType: 'image/png',
-        sampleText: ocr.text.trim(),
-        features,
-        maxResults: 10,
-      });
-      useEditorStore.getState().setFontMatches(local.provider, local.matches);
-      if (!local.matches.length) setError('No close font candidates were found. Try a larger, higher-contrast crop.');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Font identification failed.');
-    } finally {
-      if (worker) await worker.terminate();
-      setWorking(false);
-    }
+      const c=region(crop),ink=sampleInk(c.getContext('2d')!.getImageData(0,0,c.width,c.height)),fonts=await matchingCandidates(useEditorStore.getState().doc);
+      const found=await fitVisualFont(ink,text.trim(),fonts,controller.signal,(p)=>{if(token===session.current && operation.current===controller)setBusy('Fitting glyphs… '+Math.round(p*100)+'%');});
+      if (controller.signal.aborted || token!==session.current) return;
+      setSample(ink); setMatches(found); setChosen(0);
+      if (ink.height<16 || ink.contrast<35 || (found[0]?.score??0)<.65) setError('Approximate result: this sample is small, low contrast or unlike the available fonts. Check the preview; import the original font for a closer fit.');
+    } catch(e) { if (!controller.signal.aborted && token===session.current) setError(e instanceof Error?e.message:String(e)); }
+    finally { if (token===session.current && operation.current===controller) setBusy(''); }
   }
-
-  async function clone(match: FontMatch): Promise<void> {
-    if (match.googleFontsUrl && navigator.onLine) {
-      try { await loadGoogleFontByUrl(match.googleFontsUrl); } catch { /* optional font download */ }
-    }
-    addText(extractedText.trim() || 'Sample text', {
-      fontFamily: [match.family, ...(match.fallbacks ?? [])].map((family) => family.includes(' ') ? `"${family}"` : family).join(', '),
-      fontWeight: match.weight ?? 400,
-      fontStyle: match.style ?? 'normal',
-      fontSizePx: Math.max(18, Math.min(96, Math.round((crop?.h ?? 64) * 0.85))),
-      webFontUrl: navigator.onLine ? match.googleFontsUrl ?? null : null,
+  function textLayer(match: VisualMatch): TextLayer {
+    return {id:'',name:'',type:'text',text:text.trim(),visible:true,locked:false,opacity:1,blendMode:'normal',parentId:null,maskBitmapId:null,transform:{anchor:{x:0,y:0},position:{x:0,y:0},scale:{x:match.scaleX,y:1},rotation:0},fontFamily:match.family,fontWeight:match.weight,fontStyle:match.style,fontSizePx:match.size,inkMetrics:match.metrics,letterSpacingEm:match.tracking,lineHeight:1.2,align:'left',color:sample?.color??[0,0,0,1],webFontUrl:null};
+  }
+  useEffect(()=>{
+    const match=matches[chosen],c=preview.current;if(!match||!sample||!c)return;
+    c.width=sample.width+16;c.height=sample.height+16;const ctx=c.getContext('2d')!;ctx.translate(8,8);ctx.scale(match.scaleX,1);paintText(ctx,textLayer(match));
+  },[matches,chosen,sample]);
+  function apply(): void {
+    const match=matches[chosen];if(!match||!sample||!crop)return;
+    const fitted=textLayer(match),state=useEditorStore.getState();
+    state.commit('Add visually matched text',(doc)=>{
+      const next=addTextLayer(doc,{text:fitted.text}),id=next.layerOrder.at(-1)!;
+      doc.layers[id]={...fitted,id,name:'Matched text · '+match.family,transform:{...fitted.transform,position:{x:crop.x+sample.x,y:crop.y+sample.y}}};doc.layerOrder.push(id);
     });
-    onClose();
+    useEditorStore.getState().selectLayer(useEditorStore.getState().doc.layerOrder.at(-1)!);state.setActiveTool('move');onClose();
   }
-
-  function addExtractedText(): void {
-    if (!extractedText.trim()) return;
-    addText(extractedText.trim(), {
-      fontFamily: 'Arial',
-      fontWeight: 400,
-      fontStyle: 'normal',
-      fontSizePx: Math.max(18, Math.min(96, Math.round((crop?.h ?? 64) * 0.85))),
-      webFontUrl: null,
-    });
-    onClose();
+  async function importFont(file?: File): Promise<void> {
+    if(!file)return;const token=session.current;setError('');setBusy('Importing font…');
+    try {
+      if(file.size>8_000_000)throw new Error('Choose a font file smaller than 8 MB.');
+      const family=file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9 _-]/g,'').slice(0,60)+'-'+crypto.randomUUID().slice(0,6);
+      const asset={family,dataUrl:await readFileAsDataUrl(file),weight:'400',style:'normal' as const},id=crypto.randomUUID(),doc=useEditorStore.getState().doc;
+      await ensureProjectFonts({...doc,fonts:{...doc.fonts,[id]:asset}});if(token!==session.current)return;
+      useEditorStore.getState().commit('Import font',(d)=>{d.fonts={...d.fonts,[id]:asset};});setMatches([]);
+      useEditorStore.getState().setNotice('Font imported. It is included when you save this project. Fit the line again to include it.');
+    }catch(e){if(token===session.current)setError(e instanceof Error?e.message:String(e));}finally{if(token===session.current)setBusy('');}
   }
-
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Text and font extraction" className="bg-ink-900 border border-ink-700 rounded-lg w-[1024px] max-w-[95vw] max-h-[92vh] overflow-y-auto p-5 scrollbar-thin" onClick={(e) => e.stopPropagation()}>
-        <header className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Ω Text & Font Extraction</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white">✕</button>
-        </header>
-        <p className="text-sm text-zinc-400 mb-3">Select a text region. Extract its wording on-device, identify likely fonts, then add editable text layers. Font matching uses the configured font service or local fallback.</p>
-        <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Source image · drag around text</div>
-            <div className="relative inline-block max-w-full overflow-auto">
-              <canvas ref={sourceCanvasRef} className="max-w-full border border-ink-700" style={{ touchAction: 'none' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} />
-              {drag && <div className="absolute pointer-events-none border-2 border-pink-500 bg-pink-500/10" style={{ left: drag.x, top: drag.y, width: drag.w, height: drag.h }} />}
-              {crop && !drag && <div className="absolute pointer-events-none border-2 border-pink-500" style={{ left: crop.x, top: crop.y, width: crop.w, height: crop.h }} />}
-            </div>
-          </div>
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Selected region</div>
-            <canvas ref={previewRef} className="max-w-full border border-ink-700" />
-            <div className="flex flex-wrap gap-2 mt-3">
-              <button onClick={() => void extractText()} disabled={!crop || ocrWorking} className="btn-accent">{ocrWorking ? 'Reading text…' : 'Extract text on device'}</button>
-              <button onClick={() => void identify()} disabled={!crop || working} className="btn-accent">{working ? 'Identifying…' : 'Identify font'}</button>
-            </div>
-            <label className="block text-xs text-zinc-400 mt-3 mb-1" htmlFor="pef-extracted-text">Recognized text · editable</label>
-            <textarea id="pef-extracted-text" value={extractedText} onChange={(e) => setExtractedText(e.target.value)} rows={4} className="w-full rounded border border-ink-700 bg-ink-950 p-2 text-sm text-white" placeholder="Extracted wording appears here. You can correct it before adding a text layer." />
-            <button onClick={addExtractedText} disabled={!extractedText.trim()} className="mt-2 rounded bg-cyan-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Add as editable text layer</button>
-          </div>
-        </div>
-        {error && <div role="alert" className="text-red-400 text-xs mt-3">{error}</div>}
-        <div className="mt-4 border-t border-ink-700 pt-4">
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-sm font-semibold">Font matches</h3>
-            {lastFontMatchProvider && <span className="text-xs text-zinc-500">via {lastFontMatchProvider}</span>}
-          </div>
-          <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-2">
-            {lastFontMatches.map((m, i) => (
-              <div key={i} className="border border-ink-700 rounded p-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0"><div className="font-medium truncate">{m.family}</div><div className="text-xs text-zinc-500">score {(m.score * 100).toFixed(0)}% · weight {m.weight ?? 'auto'} · {m.style ?? 'normal'}</div></div>
-                <button onClick={() => void clone(m)} className="btn-accent text-xs">Create matching text</button>
-              </div>
-            ))}
-            {lastFontMatches.length === 0 && <div className="text-sm text-zinc-500 col-span-2">No matches yet. Crop a text region and identify its font.</div>}
-          </div>
-        </div>
-        <style>{`
-          .btn-accent { padding: 6px 14px; border-radius: 6px; background: #ec4899; color: white; font-weight: 500; font-size: 13px; }
-          .btn-accent:hover { background: #db2777; }
-          .btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
-        `}</style>
-      </div>
-    </div>
-  );
+  if(!open)return null;const doc=useEditorStore.getState().doc;
+  return <div className="modal-backdrop" onClick={()=>{cancel();onClose();}}><section className="editor-modal font-studio" role="dialog" aria-modal="true" aria-label="Text and font extraction" onClick={(e)=>e.stopPropagation()}>
+    <header><div><span className="eyebrow">TYPOGRAPHY STUDIO</span><h2>Find the look. Keep it editable.</h2></div><button aria-label="Close font matching" onClick={()=>{cancel();onClose();}}><Icon name="close"/></button></header>
+    <p className="muted">Scan for text, or drag around one straight line. The app compares actual rendered glyphs and automatically selects its closest fit, size, spacing and color.</p>
+    <div className="font-studio-grid"><div><div className="font-source-wrap"><div className="font-source-relative"><canvas aria-label="Font source image" ref={source} onPointerDown={(e)=>{if(busy)return;e.currentTarget.setPointerCapture(e.pointerId);start.current=point(e);setMatches([]);}} onPointerMove={(e)=>{if(start.current)setCrop(rectFrom(start.current,point(e)));}} onPointerUp={(e)=>{if(!start.current)return;const rect=rectFrom(start.current,point(e));start.current=null;if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);if(rect.w>4&&rect.h>4)select(rect);}} onPointerCancel={()=>{start.current=null;}}/>
+    {crop&&<div className="font-crop" style={{left:crop.x/doc.width*100+'%',top:crop.y/doc.height*100+'%',width:crop.w/doc.width*100+'%',height:crop.h/doc.height*100+'%'}}/>}</div></div>
+    <div className="button-row"><button disabled={!ready||!!busy} onClick={()=>void recognize(true)}>Scan whole image</button><button disabled={!crop||!!busy} onClick={()=>void recognize(false)}>Read selected line</button></div>
+    {lines.length>0&&<label className="field">Detected lines<select aria-label="Detected lines" onChange={(e)=>{const line=lines[Number(e.target.value)]!;select(line.rect,line.text,line.confidence);}}>{lines.map((line,i)=><option key={i} value={i}>{line.text}</option>)}</select></label>}
+    <p className="muted">On-device English OCR. Handwriting, curved text, heavy effects and textured backgrounds may need manual correction.</p></div>
+    <div><label className="field">Recognized wording<input aria-label="Recognized wording" value={text} disabled={!!busy} onChange={(e)=>{setText(e.target.value);setMatches([]);}} placeholder="Read the line or type its exact wording"/></label>
+    {confidence!==null&&<p className="muted">OCR confidence {Math.round(confidence)}% · correct any mistakes before fitting.</p>}
+    <button className="primary wide" disabled={!crop||!text.trim()||!!busy} onClick={()=>void fit()}>Auto-match font &amp; appearance</button>
+    {busy&&<div role="status" className="match-progress"><span>{busy}</span><button onClick={cancel}>Cancel</button></div>}
+    {matches[chosen]&&<><h3>Automatically selected · {matches[chosen]!.family}</h3><div className="font-match-preview checker"><canvas aria-label="Matched text preview" ref={preview}/></div><p className="muted">Visual fit {Math.round(matches[chosen]!.score*100)} / 100 · weight {matches[chosen]!.weight} · {matches[chosen]!.style}. This is a similarity score, not proof of font identity.</p><button className="primary wide" onClick={apply}>Add matched editable text</button><details><summary>Compare other fits</summary>{matches.map((m,i)=><button className="wide" key={i} aria-pressed={chosen===i} onClick={()=>setChosen(i)}>{m.family} · {Math.round(m.score*100)}</button>)}</details></>}
+    <div className="font-import"><h3>Have the original font?</h3><p className="muted">Import a licensed TTF, OTF, WOFF or WOFF2 file. The font travels with your saved project.</p><label className="file-button">Import font<input aria-label="Import font" type="file" accept=".ttf,.otf,.woff,.woff2" disabled={!!busy} onChange={(e)=>{void importFont(e.target.files?.[0]);e.target.value='';}}/></label></div>
+    <p className="muted">14 bundled Latin font families plus your imported fonts. An absent or custom typeface can only be approximated. Original imagery stays intact beneath the new text.</p>
+    </div></div>{error&&<p role="alert" className="error">{error}</p>}
+  </section></div>;
 }

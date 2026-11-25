@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { applyMatrix, identityTransform, invertMatrix, transformToMatrix } from '../transform.js';
 
 describe('transform', () => {
-  it('identity is identity', () => {
+  it('places the local center at the position anchor', () => {
     const m = transformToMatrix(identityTransform(), 100, 100);
     const p = applyMatrix(m, { x: 50, y: 50 });
-    // anchor 0.5,0.5 + position 0,0 — point at center stays at center
-    expect(p.x).toBeCloseTo(50, 5);
-    expect(p.y).toBeCloseTo(50, 5);
+    // The renderer places the center at position (0, 0).
+    expect(p.x).toBeCloseTo(0, 5);
+    expect(p.y).toBeCloseTo(0, 5);
   });
 
   it('translate moves point', () => {
@@ -15,8 +15,8 @@ describe('transform', () => {
     t.position = { x: 10, y: 20 };
     const m = transformToMatrix(t, 100, 100);
     const p = applyMatrix(m, { x: 50, y: 50 });
-    expect(p.x).toBeCloseTo(60, 5);
-    expect(p.y).toBeCloseTo(70, 5);
+    expect(p.x).toBeCloseTo(10, 5);
+    expect(p.y).toBeCloseTo(20, 5);
   });
 
   it('inverse undoes forward', () => {

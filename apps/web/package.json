@@ -10,8 +10,8 @@
     "test": "vitest run",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "prebuild": "node scripts/copy-tesseract-assets.mjs",
-    "predev": "node scripts/copy-tesseract-assets.mjs"
+    "prebuild": "node scripts/copy-tesseract-assets.mjs && node scripts/copy-font-licenses.mjs",
+    "predev": "node scripts/copy-tesseract-assets.mjs && node scripts/copy-font-licenses.mjs"
   },
   "dependencies": {
     "@pef/canvas-engine": "workspace:*",

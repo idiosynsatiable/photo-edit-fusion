@@ -3,9 +3,6 @@ import { FontIdentifyRequestSchema, integrationDisabled, type ApiError } from '@
 import {
   WhatTheFontProvider,
   FontspringProvider,
-  LocalSimilarityProvider,
-  binarizeOtsu,
-  extractFeatures,
   type FontIdProvider,
 } from '@pef/font-match';
 
@@ -16,11 +13,8 @@ import {
  *
  * Decision logic:
  *   - If hints.preferProvider is set, use that provider if available, else fall through.
- *   - Default order: WhatTheFont → Fontspring → local-similarity.
+ *   - Default order: WhatTheFont → Fontspring. Local visual fitting is browser-side.
  *   - Any provider failure falls through to the next.
- *   - Local similarity is always available, so the route never returns 503 for the
- *     "all integrations missing" case — it returns a structured 200 with provider:
- *     'google-fonts-similarity' so the UI can show a banner.
  */
 export async function fontIdRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/font-id', async (req, reply) => {
@@ -45,11 +39,8 @@ export async function fontIdRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send(err);
     }
 
-    // We don't decode image dimensions server-side here — the client passes a pre-cropped
-    // PNG, and we forward the bytes. Feature extraction is best-effort: if image-decoder
-    // unavailable, extractor returns zero features and the local provider still ranks
-    // by category defaults.
-    const features = await safeExtractFeatures(buf);
+    // Remote providers receive image bytes; visual fitting runs in the editor.
+    const features = { strokeDensity: 0, italicAngle: 0, aspectRatio: 0, glyphCount: 0 };
 
     const providers: FontIdProvider[] = providerChain(app, body.hints?.preferProvider);
 
@@ -71,7 +62,7 @@ export async function fontIdRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    // unreachable in practice (LocalSimilarityProvider.isAvailable() === true) but defensive
+    // Report configured-provider failures rather than inventing image-specific matches.
     if (lastError) {
       const err: ApiError = {
         error: 'upstream_error',
@@ -96,10 +87,9 @@ function providerChain(app: FastifyInstance, prefer?: 'whatthefont' | 'fontsprin
     apiKey: app.config.FONTSPRING_API_KEY,
     apiUrl: app.config.FONTSPRING_API_URL,
   });
-  const local = new LocalSimilarityProvider();
-  if (prefer === 'fontspring') return [fs, wtf, local];
-  if (prefer === 'whatthefont') return [wtf, fs, local];
-  return [wtf, fs, local];
+  if (prefer === 'fontspring') return [fs, wtf];
+  if (prefer === 'whatthefont') return [wtf, fs];
+  return [wtf, fs];
 }
 
 function decodeBase64(s: string): Uint8Array | null {
@@ -113,25 +103,3 @@ function decodeBase64(s: string): Uint8Array | null {
   }
 }
 
-/**
- * Server-side feature extraction. Without a native image decoder we cannot
- * binarize the image bytes directly; for now this returns the zero-features
- * record so the local provider still produces a ranked list based on the
- * Google Fonts catalog priors. Browsers running the same logic via the
- * font-match package's binarizeOtsu/extractFeatures get the full pipeline.
- */
-async function safeExtractFeatures(_buf: Uint8Array): Promise<{
-  strokeDensity: number;
-  italicAngle: number;
-  aspectRatio: number;
-  glyphCount: number;
-}> {
-  // Default priors approximate a regular sans-serif, used when the client
-  // hasn't supplied features. The web client computes real features and can
-  // ship them via a future hints field.
-  return { strokeDensity: 0.13, italicAngle: 0, aspectRatio: 0.55, glyphCount: 5 };
-}
-
-// keep binarize import alive for tree-shaking
-void binarizeOtsu;
-void extractFeatures;

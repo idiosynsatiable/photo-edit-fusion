@@ -1,3 +1,4 @@
+import { stampDensity } from './print-metadata.js';
 import { createDocument } from '@pef/canvas-engine';
 import { useEditorStore, validSize } from '../store/editor-store.js';
 import { loadImage, readFileAsDataUrl, downloadBlob } from './file-utils.js';
@@ -14,7 +15,7 @@ export async function importImages(files: File[], replace = false): Promise<void
       const width = image.naturalWidth, height = image.naturalHeight;
       if (!validSize(width, height)) throw new Error('Images can be up to 8192 px per side and 16 megapixels. Resize this image before importing.');
       const state = useEditorStore.getState();
-      if (i === 0 && (replace || !state.doc.layerOrder.length)) {
+      if (i === 0 && replace) {
         const next = createDocument({ name: file.name.replace(/\.[^.]+$/, '') || 'Untitled', width, height });
         next.background = [0, 0, 0, 0]; state.applyDoc(next);
       }
@@ -24,7 +25,7 @@ export async function importImages(files: File[], replace = false): Promise<void
   } catch (error) { useEditorStore.getState().setNotice(error instanceof Error ? error.message : 'This image could not be opened. Try PNG or JPEG.'); }
 }
 
-export async function exportImage(doc: Document, options: { format: 'png' | 'jpeg' | 'webp'; width: number; height: number; quality: number; background: string }): Promise<void> {
+export async function exportImage(doc: Document, options: { format: 'png' | 'jpeg' | 'webp'; width: number; height: number; quality: number; background: string; ppi?: number }): Promise<void> {
   if (!validSize(options.width, options.height)) throw new Error('Export dimensions must be positive, up to 16 megapixels.');
   const canvas = document.createElement('canvas'); canvas.width = options.width; canvas.height = options.height;
   const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('Image export is unavailable.');
@@ -37,5 +38,6 @@ export async function exportImage(doc: Document, options: { format: 'png' | 'jpe
   }
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Could not encode image.')), `image/${options.format}`, options.quality));
   if (blob.type !== `image/${options.format}`) throw new Error('Your device does not support this format. Choose PNG.');
-  await downloadBlob(blob, `${doc.name || 'Untitled'}.${options.format === 'jpeg' ? 'jpg' : options.format}`);
+  const density = stampDensity(new Uint8Array(await blob.arrayBuffer()), options.format, options.ppi ?? 300);
+  await downloadBlob(new Blob([new Uint8Array(density).buffer], { type: blob.type }), `${doc.name || 'Untitled'}.${options.format === 'jpeg' ? 'jpg' : options.format}`);
 }

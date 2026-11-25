@@ -16,6 +16,7 @@ export function layerLocalSize(l: Layer): { w: number; h: number } {
     case 'shape':
       return { w: l.width, h: l.height };
     case 'text':
+      if (l.inkMetrics) return { w: l.inkMetrics.width * l.fontSizePx, h: l.inkMetrics.height * l.fontSizePx };
       // approximate text bounds; precise bounds are computed at render time
       return { w: Math.max(1, ...l.text.split('\n').map((line) => line.length)) * l.fontSizePx * 0.55, h: l.text.split('\n').length * l.fontSizePx * l.lineHeight };
     case 'group':
@@ -27,12 +28,11 @@ export function layerWorldBounds(l: Layer): AABB {
   const { w, h } = layerLocalSize(l);
   if (w === 0 && h === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   const m = transformToMatrix(l.transform, w, h);
-  const corners: Vec2[] = [
-    { x: 0, y: 0 },
-    { x: w, y: 0 },
-    { x: w, y: h },
-    { x: 0, y: h },
-  ];
+  const outline = l.type === 'text' ? l.outline?.width ?? 0 : l.type === 'shape' ? l.strokeWidth / 2 : 0;
+  const shadow = l.type === 'text' ? l.shadow : undefined;
+  const left = Math.min(-outline, shadow ? shadow.x - shadow.blur * 3 : 0), top = Math.min(-outline, shadow ? shadow.y - shadow.blur * 3 : 0);
+  const right = Math.max(outline, shadow ? shadow.x + shadow.blur * 3 : 0), bottom = Math.max(outline, shadow ? shadow.y + shadow.blur * 3 : 0);
+  const corners: Vec2[] = [{x:left,y:top},{x:w+right,y:top},{x:w+right,y:h+bottom},{x:left,y:h+bottom}];
   const ws = corners.map((c) => applyMatrix(m, c));
   const xs = ws.map((p) => p.x);
   const ys = ws.map((p) => p.y);

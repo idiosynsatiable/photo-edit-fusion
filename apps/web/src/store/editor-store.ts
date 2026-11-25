@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { measureInk } from '../lib/typography.js';
 import {
   History,
   addImageLayer,
@@ -35,6 +36,8 @@ interface EditorState {
   fitRequest: number;
   brushSize: number;
   wandTolerance: number;
+  restoreMask: boolean;
+  setRestoreMask: (restore: boolean) => void;
   saveStatus: 'saving' | 'saved' | 'unavailable';
   gestureStart: Document | null;
   notice: string | null;
@@ -93,6 +96,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   zoom: 1,
   fitRequest: 0,
   brushSize: 40,
+  restoreMask: false,
+  setRestoreMask: (restoreMask) => set({ restoreMask }),
   wandTolerance: 24,
   saveStatus: 'saving',
   gestureStart: null,
@@ -240,6 +245,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   patchLayer: (id, patch) =>
     get().commit('Update layer', (d) => {
+      const current = d.layers[id];
+      if (current?.type === 'text' && ['text', 'fontFamily', 'fontWeight', 'fontStyle', 'letterSpacingEm', 'lineHeight'].some((key) => key in patch)) {
+        const updated = { ...current, ...patch } as TextLayer;
+        patch = { ...patch, inkMetrics: measureInk(updated) } as typeof patch;
+      }
       const next = updateLayer(d, id, patch);
       assignDoc(d, next);
     }),
@@ -281,6 +291,7 @@ function assignDoc(target: Document, source: Document): void {
   target.layers = source.layers;
   target.bitmaps = source.bitmaps;
   target.background = source.background;
+  target.fonts = source.fonts;
   target.meta = source.meta;
 }
 
