@@ -1,0 +1,155 @@
+name: Android Production AAB
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: photo-edit-fusion-production-aab
+  cancel-in-progress: false
+
+jobs:
+  production-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Validate protected signing secrets
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Required GitHub Actions secret $name is missing."
+              exit 1
+            fi
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/photo-edit-fusion-upload.jks"
+          chmod 600 "$RUNNER_TEMP/photo-edit-fusion-upload.jks"
+          test -s "$RUNNER_TEMP/photo-edit-fusion-upload.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/photo-edit-fusion-upload.jks" >> "$GITHUB_ENV"
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build offline-first web editor
+        run: pnpm build
+        env:
+          VITE_API_BASE_URL: ''
+
+      - name: Generate Android project and sync plugins
+        run: |
+          pnpm exec cap add android
+          pnpm exec cap sync android
+
+      - name: Verify bundled offline OCR assets
+        run: |
+          set -euo pipefail
+          test -s android/app/src/main/assets/public/tesseract/worker.min.js
+          test -s android/app/src/main/assets/public/tesseract/lang/eng.traineddata
+          test -s android/app/src/main/assets/public/tesseract/core/manifest.json
+          find android/app/src/main/assets/public/tesseract/core -maxdepth 1 -name '*.wasm' -type f | grep .
+
+      - name: Configure protected release signing
+        working-directory: android
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("app/build.gradle")
+          source = path.read_text()
+          if "signingConfigs" in source and "signingConfigs.release" in source:
+              raise SystemExit("Release signing already configured; refusing duplicate injection.")
+          signing = """
+              signingConfigs {
+                  release {
+                      storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }
+          """
+          source, count = re.subn(r'(android\\s*\\{)', r'\\1' + signing, source, count=1)
+          if count != 1:
+              raise SystemExit("Could not locate the Android Gradle android block.")
+          pattern = r'(buildTypes\\s*\\{\\s*release\\s*\\{)'
+          source, count = re.subn(pattern, r'\\1\\n            signingConfig signingConfigs.release', source, count=1)
+          if count != 1:
+              raise SystemExit("Could not locate the release build type for signing.")
+          path.write_text(source)
+          PY
+          test -s "$ANDROID_KEYSTORE_PATH"
+
+      - name: Build production Android App Bundle
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon bundleRelease
+
+      - name: Verify signed AAB and Android target
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB="android/app/build/outputs/bundle/release/app-release.aab"
+          test -s "$AAB"
+          jarsigner -verify -verbose -certs "$AAB" >/dev/null
+          unzip -p "$AAB" base/manifest/AndroidManifest.xml > "$RUNNER_TEMP/aab-manifest.bin"
+          test -s "$RUNNER_TEMP/aab-manifest.bin"
+          echo "Signed AAB exists and JAR signature verification passed."
+          sha256sum "$AAB"
+
+      - name: Upload production AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: photo-edit-fusion-production-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${RUNNER_TEMP:-}" ]]; then
+            rm -f "$RUNNER_TEMP/photo-edit-fusion-upload.jks" "$RUNNER_TEMP/aab-manifest.bin"
+          fi
